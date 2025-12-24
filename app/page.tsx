@@ -25,6 +25,7 @@ interface EditingCell {
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<string>("customers");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
   const navItems: NavItem[] = [
     { id: "dashboard", label: "Home" },
@@ -331,7 +332,51 @@ export default function Home() {
               </button>
             ))}
           </nav>
+
+          {/* Hamburger Menu Button */}
+          <button 
+            className="hamburger-menu"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            title="Menu"
+          >
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
         </div>
+
+        {/* Mobile Navigation Panel */}
+        {mobileMenuOpen && (
+          <div className="mobile-nav-overlay" onClick={() => setMobileMenuOpen(false)}>
+            <div className="mobile-nav-panel" onClick={(e) => e.stopPropagation()}>
+              <div className="mobile-nav-header">
+                <h2>Menu</h2>
+                <button 
+                  className="close-mobile-menu"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  ✕
+                </button>
+              </div>
+              <nav className="mobile-nav-items">
+                {navItems.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setActiveTab(item.id);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`mobile-nav-item ${activeTab === item.id ? "active" : ""}`}
+                  >
+                    <span className="mobile-nav-icon">{item.icon}</span>
+                    <span className="mobile-nav-label">{item.label}</span>
+                    {item.hasDropdown && <span className="mobile-dropdown-arrow">›</span>}
+                  </button>
+                ))}
+              </nav>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Main Content */}
