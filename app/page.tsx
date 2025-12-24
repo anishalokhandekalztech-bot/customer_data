@@ -2,19 +2,40 @@
 
 import { useState } from "react";
 
-export default function Home() {
-  const [activeTab, setActiveTab] = useState("customers");
+interface NavItem {
+  id: string;
+  label: string;
+  icon?: string;
+  hasDropdown?: boolean;
+}
 
-  const navItems = [
-    { id: "dashboard", label: "Home"},
+interface DataRow {
+  id: number;
+  name: string;
+  phone: string;
+  email: string;
+  city: string;
+  services: string;
+}
+
+interface EditingCell {
+  rowId: number;
+  field: string;
+}
+
+export default function Home() {
+  const [activeTab, setActiveTab] = useState<string>("customers");
+
+  const navItems: NavItem[] = [
+    { id: "dashboard", label: "Home" },
     { id: "reports", label: "About Us" },
-    { id: "analytics", label:"Start a Business", hasDropdown: true },
+    { id: "analytics", label: "Start a Business", hasDropdown: true },
     { id: "settings", label: "Trademark Registration", hasDropdown: true },
     { id: "users", label: "Annual Compliance", hasDropdown: true },
     { id: "support", label: "Other Services", hasDropdown: true },
     { id: "customers", label: "Form Enteries" },
   ];
-  const initialData = [
+  const initialData: DataRow[] = [
     { id: 1, name: "John Doe", phone: "555-0101", email: "john@example.com", city: "New York", services: "Consulting" },
     { id: 2, name: "Jane Smith", phone: "555-0102", email: "jane@example.com", city: "Los Angeles", services: "Development" },
     { id: 3, name: "Bob Johnson", phone: "555-0103", email: "bob@example.com", city: "Chicago", services: "Design" },
@@ -42,15 +63,15 @@ export default function Home() {
     { id: 25, name: "William Davis", phone: "555-0125", email: "william@example.com", city: "Las Vegas", services: "Support" },
   ];
 
-  const [data, setData] = useState(initialData);
-  const [editingCell, setEditingCell] = useState(null);
-  const [editValue, setEditValue] = useState("");
-  const [deleteMode, setDeleteMode] = useState(false);
-  const [selectedForDelete, setSelectedForDelete] = useState(new Set());
-  const [selectedRow, setSelectedRow] = useState(null);
+  const [data, setData] = useState<DataRow[]>(initialData);
+  const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
+  const [editValue, setEditValue] = useState<string>("");
+  const [deleteMode, setDeleteMode] = useState<boolean>(false);
+  const [selectedForDelete, setSelectedForDelete] = useState<Set<number>>(new Set());
+  const [selectedRow, setSelectedRow] = useState<number | null>(null);
 
   const handleAddRow = () => {
-    const newRow = {
+    const newRow: DataRow = {
       id: data.length + 1,
       name: "New Entry",
       phone: "555-0000",
@@ -61,16 +82,16 @@ export default function Home() {
     setData([...data, newRow]);
   };
 
-  const handleCellClick = (rowId, field, value) => {
+  const handleCellClick = (rowId: number, field: string, value: any) => {
     setEditingCell({ rowId, field });
     setEditValue(value);
   };
 
-  const handleCellChange = (e) => {
+  const handleCellChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEditValue(e.target.value);
   };
 
-  const handleCellBlur = (rowId, field) => {
+  const handleCellBlur = (rowId: number, field: string) => {
     if (editingCell && editingCell.rowId === rowId && editingCell.field === field) {
       const updatedData = data.map((row) =>
         row.id === rowId ? { ...row, [field]: editValue } : row
@@ -80,7 +101,7 @@ export default function Home() {
     }
   };
 
-  const handleKeyDown = (e, rowId, field) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, rowId: number, field: string) => {
     if (e.key === "Enter") {
       handleCellBlur(rowId, field);
     } else if (e.key === "Escape") {
@@ -88,7 +109,7 @@ export default function Home() {
     }
   };
 
-  const handleRowSelect = (rowId) => {
+  const handleRowSelect = (rowId: number) => {
     setSelectedRow(selectedRow === rowId ? null : rowId);
   };
 
@@ -107,7 +128,7 @@ export default function Home() {
     }
   };
 
-  const handleRowSelectForDelete = (rowId) => {
+  const handleRowSelectForDelete = (rowId: number) => {
     const newSelected = new Set(selectedForDelete);
     if (newSelected.has(rowId)) {
       newSelected.delete(rowId);
@@ -271,7 +292,7 @@ export default function Home() {
                         key={`${row.id}-${field}`}
                         className="table-cell"
                         onDoubleClick={() =>
-                          handleCellClick(row.id, field, row[field])
+                          handleCellClick(row.id, field, row[field as keyof DataRow])
                         }
                       >
                         {editingCell?.rowId === row.id && editingCell?.field === field ? (
@@ -285,7 +306,7 @@ export default function Home() {
                             className="table-input"
                           />
                         ) : (
-                          <div className="table-cell-content">{row[field]}</div>
+                          <div className="table-cell-content">{row[field as keyof DataRow]}</div>
                         )}
                       </td>
                     ))}
