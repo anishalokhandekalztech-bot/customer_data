@@ -69,6 +69,14 @@ export default function Home() {
   const [deleteMode, setDeleteMode] = useState<boolean>(false);
   const [selectedForDelete, setSelectedForDelete] = useState<Set<number>>(new Set());
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [filterField, setFilterField] = useState<string>("");
+  const [sortOrder, setSortOrder] = useState<string>("asc");
+  const [history, setHistory] = useState<DataRow[][]>([initialData]);
+  const [historyIndex, setHistoryIndex] = useState<number>(0);
+  const [updatedCells, setUpdatedCells] = useState<Map<string, string>>(new Map());
+  const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState<boolean>(false);
 
   const handleAddRow = () => {
     const newRow: DataRow = {
@@ -93,10 +101,14 @@ export default function Home() {
 
   const handleCellBlur = (rowId: number, field: string) => {
     if (editingCell && editingCell.rowId === rowId && editingCell.field === field) {
-      const updatedData = data.map((row) =>
-        row.id === rowId ? { ...row, [field]: editValue } : row
-      );
-      setData(updatedData);
+      // Only mark as updated if the value actually changed
+      const originalValue = data.find(row => row.id === rowId)?.[field as keyof DataRow];
+      if (String(originalValue) !== String(editValue)) {
+        const cellKey = `${rowId}-${field}`;
+        const newUpdatedCells = new Map(updatedCells);
+        newUpdatedCells.set(cellKey, editValue);
+        setUpdatedCells(newUpdatedCells);
+      }
       setEditingCell(null);
     }
   };
@@ -106,6 +118,7 @@ export default function Home() {
       handleCellBlur(rowId, field);
     } else if (e.key === "Escape") {
       setEditingCell(null);
+      setEditValue("");
     }
   };
 
@@ -113,10 +126,55 @@ export default function Home() {
     setSelectedRow(selectedRow === rowId ? null : rowId);
   };
 
+  const handleUpdateChanges = () => {
+    if (updatedCells.size === 0) return;
+    setShowConfirmModal(true);
+  };
+
+  const confirmUpdate = () => {
+    const updatedData = data.map((row) => {
+      let updatedRow = { ...row };
+
+      updatedCells.forEach((value, cellKey) => {
+        const [rowId, field] = cellKey.split("-");
+        if (parseInt(rowId) === row.id) {
+          updatedRow = { ...updatedRow, [field]: value };
+        }
+      });
+
+      return updatedRow;
+    });
+
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(updatedData);
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+
+    setData(updatedData);
+    setUpdatedCells(new Map());
+    setShowConfirmModal(false);
+    setEditingCell(null);
+  };
+
+  const cancelUpdate = () => {
+    setShowConfirmModal(false);
+  };
+
+  const cancelEditing = () => {
+    setUpdatedCells(new Map());
+    setEditingCell(null);
+    setDeleteMode(false);
+    setSelectedForDelete(new Set());
+  };
+
   const handleDelete = () => {
     if (editingCell) {
       // Delete the row being edited
       const updatedData = data.filter((row) => row.id !== editingCell.rowId);
+      const newHistory = history.slice(0, historyIndex + 1);
+      newHistory.push(updatedData);
+      setHistory(newHistory);
+      setHistoryIndex(newHistory.length - 1);
       setData(updatedData);
       setEditingCell(null);
     } else {
@@ -139,10 +197,41 @@ export default function Home() {
   };
 
   const handleConfirmDelete = () => {
+    setShowDeleteConfirmModal(true);
+  };
+
+  const confirmDelete = () => {
     const updatedData = data.filter((row) => !selectedForDelete.has(row.id));
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(updatedData);
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
     setData(updatedData);
     setDeleteMode(false);
     setSelectedForDelete(new Set());
+    setShowDeleteConfirmModal(false);
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteConfirmModal(false);
+  };
+
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      setData(history[newIndex]);
+      setEditingCell(null);
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      setData(history[newIndex]);
+      setEditingCell(null);
+    }
   };
 
   const handleExport = () => {
@@ -192,6 +281,28 @@ export default function Home() {
     window.URL.revokeObjectURL(url);
   };
 
+  // Filter and search logic
+  const filteredData = data
+    .filter((row) => {
+      const searchMatch = searchTerm === "" || 
+        Object.values(row).some((value) => 
+          String(value).toLowerCase().includes(searchTerm.toLowerCase())
+        );
+      return searchMatch;
+    })
+    .sort((a, b) => {
+      if (!filterField) return 0;
+
+      const fieldA = String(a[filterField as keyof DataRow]).toLowerCase();
+      const fieldB = String(b[filterField as keyof DataRow]).toLowerCase();
+
+      let comparison = 0;
+      if (fieldA < fieldB) comparison = -1;
+      if (fieldA > fieldB) comparison = 1;
+
+      return sortOrder === "asc" ? comparison : -comparison;
+    });
+
   return (
     <>
       {/* Header with Navigation */}
@@ -232,27 +343,125 @@ export default function Home() {
               <button onClick={handleAddRow} className="btn btn-add">
                 + Add Row
               </button>
-              {deleteMode ? (
+              {updatedCells.size > 0 && (
+                <>
+                  <button onClick={handleUpdateChanges} className="btn btn-update">
+                    ✓ Update ({updatedCells.size})
+                  </button>
+                  <button onClick={cancelEditing} className="btn btn-cancel">
+                    Cancel
+                  </button>
+                </>
+              )}
+              {deleteMode && updatedCells.size === 0 ? (
                 <>
                   <button onClick={handleConfirmDelete} className="btn btn-delete-confirm" disabled={selectedForDelete.size === 0}>
                     Delete {selectedForDelete.size > 0 ? `(${selectedForDelete.size})` : ""}
                   </button>
-                  <button onClick={handleDelete} className="btn btn-cancel">
+                  <button onClick={cancelEditing} className="btn btn-cancel">
                     Cancel
                   </button>
                 </>
-              ) : (
+              ) : updatedCells.size === 0 ? (
                 <button onClick={handleDelete} className="btn btn-delete">
                   🗑 Delete
                 </button>
-              )}
+              ) : null}
               <button onClick={handleExport} className="btn btn-export">
                  Export
               </button>
               <button onClick={handleViewInExcel} className="btn btn-excel">
                  View in Excel
               </button>
+              <div className="undo-redo-icons">
+                <button 
+                  onClick={handleUndo} 
+                  className="icon-btn icon-undo"
+                  disabled={historyIndex <= 0}
+                  title="Undo"
+                >
+                  ↶
+                </button>
+                <button 
+                  onClick={handleRedo} 
+                  className="icon-btn icon-redo"
+                  disabled={historyIndex >= history.length - 1}
+                  title="Redo"
+                >
+                  ↷
+                </button>
+              </div>
             </div>
+          </div>
+
+          {/* Search and Filter Section */}
+          <div className="search-filter-section">
+            <div className="search-container">
+              <input
+                type="text"
+                placeholder="Search across all fields..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="search-input"
+              />
+            </div>
+            <div className="filter-sort-container">
+              <div className="filter-container">
+                <label className="filter-label">Sort by:</label>
+                <select
+                  value={filterField}
+                  onChange={(e) => {
+                    setFilterField(e.target.value);
+                    setSortOrder("asc");
+                  }}
+                  className="filter-select"
+                >
+                  <option value="">-- None --</option>
+                  <option value="name">Name</option>
+                  <option value="phone">Phone</option>
+                  <option value="email">Email</option>
+                  <option value="city">City</option>
+                  <option value="services">Services</option>
+                </select>
+              </div>
+
+              {filterField && (
+                <div className="sort-container">
+                  <label className="sort-label">Order:</label>
+                  <div className="sort-buttons">
+                    <button
+                      onClick={() => setSortOrder("asc")}
+                      className={`sort-btn ${sortOrder === "asc" ? "active" : ""}`}
+                    >
+                      {filterField === "name" || filterField === "city" ? "A-Z" : filterField === "services" ? "First Service" : "Ascending"}
+                    </button>
+                    <button
+                      onClick={() => setSortOrder("desc")}
+                      className={`sort-btn ${sortOrder === "desc" ? "active" : ""}`}
+                    >
+                      {filterField === "name" || filterField === "city" ? "Z-A" : filterField === "services" ? "Last Service" : "Descending"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {(searchTerm || filterField) && (
+              <button
+                onClick={() => {
+                  setSearchTerm("");
+                  setFilterField("");
+                  setSortOrder("asc");
+                }}
+                className="btn btn-clear"
+              >
+                Clear All
+              </button>
+            )}
+          </div>
+
+          <div className="table-info">
+            Showing {filteredData.length} of {data.length} entries
           </div>
           <div className="table-wrapper">
             <table className="table">
@@ -267,7 +476,9 @@ export default function Home() {
                 </tr>
               </thead>
               <tbody>
-                {data.map((row) => (
+
+
+                {filteredData.map((row) => (
                   <tr 
                     key={row.id} 
                     className={`table-row ${editingCell?.rowId === row.id ? "editing" : ""} ${deleteMode && selectedForDelete.has(row.id) ? "selected-for-delete" : ""} ${selectedRow === row.id ? "selected" : ""}`}
@@ -287,10 +498,13 @@ export default function Home() {
                         <div className="table-cell-content">{row.id}</div>
                       </td>
                     )}
-                    {["name", "phone", "email", "city", "services"].map((field) => (
+                    {["name", "phone", "email", "city", "services"].map((field) => {
+                      const cellKey = `${row.id}-${field}`;
+                      const isUpdated = updatedCells.has(cellKey);
+                      return (
                       <td
-                        key={`${row.id}-${field}`}
-                        className="table-cell"
+                        key={cellKey}
+                        className={`table-cell ${editingCell?.rowId === row.id && editingCell?.field === field ? "editing-cell" : ""} ${isUpdated ? "updated-cell" : ""}`}
                         onDoubleClick={() =>
                           handleCellClick(row.id, field, row[field as keyof DataRow])
                         }
@@ -306,10 +520,11 @@ export default function Home() {
                             className="table-input"
                           />
                         ) : (
-                          <div className="table-cell-content">{row[field as keyof DataRow]}</div>
+                          <div className="table-cell-content">{isUpdated ? updatedCells.get(cellKey) : row[field as keyof DataRow]}</div>
                         )}
                       </td>
-                    ))}
+                    );
+                    })}
                   </tr>
                 ))}
               </tbody>
@@ -317,6 +532,42 @@ export default function Home() {
           </div>
       </div>
     </div>
+
+    {/* Confirmation Modal */}
+    {showConfirmModal && (
+      <div className="modal-overlay">
+        <div className="modal-content">
+          <h2 className="modal-title">Confirm Update</h2>
+          <p className="modal-message">Are you sure you want to update {updatedCells.size} change{updatedCells.size > 1 ? 's' : ''}?</p>
+          <div className="modal-buttons">
+            <button onClick={confirmUpdate} className="btn btn-confirm">
+              Confirm
+            </button>
+            <button onClick={cancelUpdate} className="btn btn-modal-cancel">
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Delete Confirmation Modal */}
+    {showDeleteConfirmModal && (
+      <div className="modal-overlay">
+        <div className="modal-content">
+          <h2 className="modal-title">Confirm Delete</h2>
+          <p className="modal-message">Are you sure you want to delete {selectedForDelete.size} row{selectedForDelete.size > 1 ? 's' : ''}? This action cannot be undone.</p>
+          <div className="modal-buttons">
+            <button onClick={confirmDelete} className="btn btn-confirm">
+              Confirm
+            </button>
+            <button onClick={cancelDelete} className="btn btn-modal-cancel">
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     </>
   );
 }
