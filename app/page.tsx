@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 interface NavItem {
   id: string;
@@ -26,6 +26,7 @@ interface EditingCell {
 export default function Home() {
   const [activeTab, setActiveTab] = useState<string>("customers");
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+  const tableWrapperRef = useRef<HTMLDivElement>(null);
 
   const navItems: NavItem[] = [
     { id: "dashboard", label: "Home" },
@@ -78,6 +79,8 @@ export default function Home() {
   const [updatedCells, setUpdatedCells] = useState<Map<string, string>>(new Map());
   const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState<boolean>(false);
+  const [sortDropdownOpen, setSortDropdownOpen] = useState<boolean>(false);
+  const [showSortDisclaimer, setShowSortDisclaimer] = useState<boolean>(false);
 
   const handleAddRow = () => {
     const newRow: DataRow = {
@@ -88,7 +91,23 @@ export default function Home() {
       city: "City",
       services: "Service",
     };
-    setData([...data, newRow]);
+    const newData = [...data, newRow];
+    
+    // Add to history stack (clear redo history)
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(newData);
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+    
+    setData(newData);
+    setSelectedRow(newRow.id);
+    
+    // Scroll to the newly added row
+    setTimeout(() => {
+      if (tableWrapperRef.current) {
+        tableWrapperRef.current.scrollTop = tableWrapperRef.current.scrollHeight;
+      }
+    }, 0);
   };
 
   const handleCellClick = (rowId: number, field: string, value: any) => {
@@ -125,6 +144,10 @@ export default function Home() {
 
   const handleRowSelect = (rowId: number) => {
     setSelectedRow(selectedRow === rowId ? null : rowId);
+    // Deselect column when selecting a row
+    if (selectedRow !== rowId) {
+      setFilterField("");
+    }
   };
 
   const handleUpdateChanges = () => {
@@ -223,6 +246,10 @@ export default function Home() {
       setHistoryIndex(newIndex);
       setData(history[newIndex]);
       setEditingCell(null);
+      setSelectedRow(null);
+      setUpdatedCells(new Map());
+      setDeleteMode(false);
+      setSelectedForDelete(new Set());
     }
   };
 
@@ -232,29 +259,29 @@ export default function Home() {
       setHistoryIndex(newIndex);
       setData(history[newIndex]);
       setEditingCell(null);
+      setSelectedRow(null);
+      setUpdatedCells(new Map());
+      setDeleteMode(false);
+      setSelectedForDelete(new Set());
     }
   };
 
   const handleExport = () => {
-    const csv = [
-      ["Sr No.", "Name", "Phone No.", "Email", "City", "Services"],
-      ...data.map((row) => [
-        row.id,
-        row.name,
-        row.phone,
-        row.email,
-        row.city,
-        row.services,
-      ]),
-    ]
-      .map((row) => row.map((cell) => `"${cell}"`).join(","))
-      .join("\n");
+    const jsonData = data.map((row) => ({
+      "Sr No.": row.id,
+      "Name": row.name,
+      "Phone No.": row.phone,
+      "Email": row.email,
+      "City": row.city,
+      "Services": row.services,
+    }));
 
-    const blob = new Blob([csv], { type: "text/csv" });
+    const jsonString = JSON.stringify(jsonData, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "customer_data.csv";
+    a.download = "customer_data.json";
     a.click();
   };
 
@@ -451,44 +478,50 @@ export default function Home() {
               />
             </div>
             <div className="filter-sort-container">
-              <div className="filter-container">
-                <label className="filter-label">Sort by:</label>
-                <select
-                  value={filterField}
-                  onChange={(e) => {
-                    setFilterField(e.target.value);
-                    setSortOrder("asc");
+              <div className="sort-dropdown-container">
+                <button
+                  onClick={() => {
+                    if (!filterField) {
+                      setShowSortDisclaimer(true);
+                      return;
+                    }
+                    setSortDropdownOpen(!sortDropdownOpen);
+                    setShowSortDisclaimer(false);
                   }}
-                  className="filter-select"
+                  className="sort-dropdown-btn"
                 >
-                  <option value="">-- None --</option>
-                  <option value="name">Name</option>
-                  <option value="phone">Phone</option>
-                  <option value="email">Email</option>
-                  <option value="city">City</option>
-                  <option value="services">Services</option>
-                </select>
-              </div>
-
-              {filterField && (
-                <div className="sort-container">
-                  <label className="sort-label">Order:</label>
-                  <div className="sort-buttons">
+                  Sort {sortDropdownOpen ? "∧" : "∨"}
+                </button>
+                
+                {showSortDisclaimer && (
+                  <div className="sort-disclaimer">
+                    ⚠ Please select a column to sort
+                  </div>
+                )}
+                
+                {sortDropdownOpen && filterField && (
+                  <div className="sort-dropdown-menu">
                     <button
-                      onClick={() => setSortOrder("asc")}
-                      className={`sort-btn ${sortOrder === "asc" ? "active" : ""}`}
+                      onClick={() => {
+                        setSortOrder("asc");
+                        setSortDropdownOpen(false);
+                      }}
+                      className={`sort-option ${sortOrder === "asc" ? "active" : ""}`}
                     >
-                      {filterField === "name" || filterField === "city" ? "A-Z" : filterField === "services" ? "First Service" : "Ascending"}
+                      {filterField === "name" || filterField === "city" || filterField === "services" || filterField === "email" ? "A - Z" : "Ascending"}
                     </button>
                     <button
-                      onClick={() => setSortOrder("desc")}
-                      className={`sort-btn ${sortOrder === "desc" ? "active" : ""}`}
+                      onClick={() => {
+                        setSortOrder("desc");
+                        setSortDropdownOpen(false);
+                      }}
+                      className={`sort-option ${sortOrder === "desc" ? "active" : ""}`}
                     >
-                      {filterField === "name" || filterField === "city" ? "Z-A" : filterField === "services" ? "Last Service" : "Descending"}
+                      {filterField === "name" || filterField === "city" || filterField === "services" || filterField === "email" ? "Z - A" : "Descending"}
                     </button>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {(searchTerm || filterField) && (
@@ -505,19 +538,61 @@ export default function Home() {
             )}
           </div>
 
-          <div className="table-info">
-            Showing {filteredData.length} of {data.length} entries
-          </div>
-          <div className="table-wrapper">
+          <div className="table-wrapper" ref={tableWrapperRef}>
             <table className="table">
               <thead className="table-head">
                 <tr>
                   <th className="table-header">Sr No.</th>
-                  <th className="table-header">Name</th>
-                  <th className="table-header">Phone No.</th>
-                  <th className="table-header">Email</th>
-                  <th className="table-header">City</th>
-                  <th className="table-header">Services</th>
+                  <th 
+                    className={`table-header column-selectable ${filterField === "name" ? "selected-column" : ""}`}
+                    onDoubleClick={() => {
+                      setFilterField("name");
+                      setSortOrder("asc");
+                      setShowSortDisclaimer(false);
+                    }}
+                  >
+                    Name
+                  </th>
+                  <th 
+                    className={`table-header column-selectable ${filterField === "phone" ? "selected-column" : ""}`}
+                    onDoubleClick={() => {
+                      setFilterField("phone");
+                      setSortOrder("asc");
+                      setShowSortDisclaimer(false);
+                    }}
+                  >
+                    Phone No.
+                  </th>
+                  <th 
+                    className={`table-header column-selectable ${filterField === "email" ? "selected-column" : ""}`}
+                    onDoubleClick={() => {
+                      setFilterField("email");
+                      setSortOrder("asc");
+                      setShowSortDisclaimer(false);
+                    }}
+                  >
+                    Email
+                  </th>
+                  <th 
+                    className={`table-header column-selectable ${filterField === "city" ? "selected-column" : ""}`}
+                    onDoubleClick={() => {
+                      setFilterField("city");
+                      setSortOrder("asc");
+                      setShowSortDisclaimer(false);
+                    }}
+                  >
+                    City
+                  </th>
+                  <th 
+                    className={`table-header column-selectable ${filterField === "services" ? "selected-column" : ""}`}
+                    onDoubleClick={() => {
+                      setFilterField("services");
+                      setSortOrder("asc");
+                      setShowSortDisclaimer(false);
+                    }}
+                  >
+                    Services
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -546,10 +621,11 @@ export default function Home() {
                     {["name", "phone", "email", "city", "services"].map((field) => {
                       const cellKey = `${row.id}-${field}`;
                       const isUpdated = updatedCells.has(cellKey);
+                      const isColumnSelected = filterField === field;
                       return (
                       <td
                         key={cellKey}
-                        className={`table-cell ${editingCell?.rowId === row.id && editingCell?.field === field ? "editing-cell" : ""} ${isUpdated ? "updated-cell" : ""}`}
+                        className={`table-cell ${editingCell?.rowId === row.id && editingCell?.field === field ? "editing-cell" : ""} ${isUpdated ? "updated-cell" : ""} ${isColumnSelected ? "selected-column-cell" : ""}`}
                         onDoubleClick={() =>
                           handleCellClick(row.id, field, row[field as keyof DataRow])
                         }
@@ -574,6 +650,9 @@ export default function Home() {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="table-info-bottom">
+            Showing {filteredData.length} of {data.length} entries
           </div>
       </div>
     </div>

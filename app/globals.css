@@ -592,6 +592,7 @@ body {
   width: 100%;
   border-collapse: collapse;
   font-size: 11px;
+  table-layout: auto;
 }
 
 .table-head {
@@ -610,8 +611,42 @@ body {
   border-right: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.column-selectable {
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+.column-selectable:hover {
+  background-color: rgba(167, 66, 5, 0.1);
+}
+
+.selected-column {
+  background-color: var(--primary-orange);
+  color: var(--primary-white);
+  font-weight: 700;
+}
+
 .table-header:last-child {
   border-right: none;
+}
+
+.selected-column {
+  background-color: var(--primary-orange);
+  color: var(--primary-white);
+  font-weight: 700;
+  border-top: 2px solid #ef4444 !important;
+  border-left: 2px solid #ef4444 !important;
+  border-right: 2px solid #ef4444 !important;
+}
+
+.selected-column-cell {
+  border-left: 2px solid #ef4444 !important;
+  border-right: 2px solid #ef4444 !important;
+}
+
+.table-row:last-child .selected-column-cell {
+  border-bottom: 2px solid #ef4444 !important;
 }
 
 .table-row {
@@ -702,6 +737,9 @@ body {
   display: flex;
   align-items: center;
   color: var(--text-dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Sr No column - non-editable */
@@ -803,11 +841,21 @@ body {
 
   .table-wrapper {
     max-height: 400px;
+    display: flex;
+    justify-content: center;
   }
 
-  .table-header,
+  .table {
+    width: auto;
+  }
+
+  .table-header {
+    padding: 8px 15px;
+    font-size: 12px;
+  }
+
   .table-cell-content {
-    padding: 10px 8px;
+    padding: 7px 15px;
     font-size: 12px;
   }
 }
@@ -842,9 +890,9 @@ body {
 /* Search and Filter Section */
 .search-filter-section {
   display: flex;
-  gap: 0.4rem;
-  margin: 0.35rem 0;
-  padding: 0.4rem;
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+  padding: 0.75rem;
   background-color: #fafafa;
   border-radius: 6px;
   border: 1px solid var(--border-color);
@@ -859,14 +907,13 @@ body {
 
 .search-input {
   width: 100%;
-  padding: 0.35rem 0.5rem;
-  font-size: 11px;
+  padding: 0.5rem 0.6rem;
+  font-size: 12px;
   border: 1px solid var(--border-color);
   border-radius: 5px;
   background-color: var(--primary-white);
   color: var(--text-dark);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  height: 30px;
 }
 
 .search-input:focus {
@@ -877,7 +924,7 @@ body {
 
 .filter-sort-container {
   display: flex;
-  gap: 1rem;
+  gap: 1.5rem;
   align-items: flex-end;
   flex-wrap: wrap;
 }
@@ -885,19 +932,18 @@ body {
 .filter-container {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.5rem;
 }
 
 .filter-label {
   font-weight: 600;
   color: var(--text-dark);
-  font-size: 10px;
-  line-height: 1;
+  font-size: 11px;
 }
 
 .filter-select {
-  padding: 0.35rem 0.5rem;
-  font-size: 11px;
+  padding: 0.5rem 0.6rem;
+  font-size: 12px;
   border: 1px solid var(--border-color);
   border-radius: 5px;
   background-color: var(--primary-white);
@@ -905,7 +951,6 @@ body {
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
   min-width: 100px;
   cursor: pointer;
-  height: 30px;
 }
 
 .filter-select:focus {
@@ -917,24 +962,23 @@ body {
 .sort-container {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.5rem;
 }
 
 .sort-label {
   font-weight: 600;
   color: var(--text-dark);
-  font-size: 10px;
-  line-height: 1;
+  font-size: 11px;
 }
 
 .sort-buttons {
   display: flex;
-  gap: 0.3rem;
+  gap: 0.4rem;
 }
 
 .sort-btn {
-  padding: 0.3rem 0.5rem;
-  font-size: 10px;
+  padding: 0.4rem 0.6rem;
+  font-size: 11px;
   border: 2px solid var(--border-color);
   border-radius: 4px;
   background-color: var(--primary-white);
@@ -942,7 +986,6 @@ body {
   cursor: pointer;
   transition: all 0.2s ease;
   font-weight: 500;
-  height: 30px;
 }
 
 .sort-btn:hover {
@@ -955,17 +998,97 @@ body {
   border-color: var(--primary-orange);
 }
 
+/* New Sort Dropdown Styles */
+.sort-dropdown-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sort-dropdown-btn {
+  padding: 0.5rem 0.8rem;
+  font-size: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  background-color: var(--primary-white);
+  color: var(--text-dark);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.sort-dropdown-btn:hover {
+  border-color: var(--primary-orange);
+  background-color: rgba(167, 66, 5, 0.05);
+}
+
+.sort-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background-color: var(--primary-white);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  min-width: 140px;
+  margin-top: 0.5rem;
+}
+
+.sort-option {
+  display: block;
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  text-align: left;
+  font-size: 12px;
+  border: none;
+  background-color: var(--primary-white);
+  color: var(--text-dark);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.sort-option:first-child {
+  border-radius: 4px 4px 0 0;
+}
+
+.sort-option:last-child {
+  border-radius: 0 0 4px 4px;
+}
+
+.sort-option:hover {
+  background-color: rgba(167, 66, 5, 0.1);
+}
+
+.sort-option.active {
+  background-color: var(--primary-orange);
+  color: var(--primary-white);
+}
+
+.sort-disclaimer {
+  color: #d97706;
+  font-size: 12px;
+  padding: 0.5rem 0.6rem;
+  background-color: #fef3c7;
+  border: 1px solid #fcd34d;
+  border-radius: 4px;
+  margin-top: 0.25rem;
+}
+
 .btn-clear {
   background-color: #666;
   color: white;
-  padding: 0.4rem 0.6rem;
+  padding: 0.5rem 0.8rem;
   border: none;
   border-radius: 5px;
   font-weight: 600;
   cursor: pointer;
   transition: background-color 0.2s ease;
-  font-size: 10px;
-  height: 30px;
+  font-size: 11px;
+  height: fit-content;
 }
 
 .btn-clear:hover {
@@ -1327,6 +1450,13 @@ body {
   border-left: 3px solid var(--primary-orange);
 }
 
+.table-info-bottom {
+  font-size: 9px;
+  color: var(--text-light);
+  margin-top: 0.4rem;
+  padding: 0;
+}
+
 /* Responsive design for search and filter */
 @media (max-width: 1024px) {
   .search-filter-section {
@@ -1499,4 +1629,18 @@ body {
   font-weight: 600;
   cursor: pointer;
   transition: background-color 0.2s ease;
+}
+
+/* Responsive button layout for very small screens */
+@media (max-width: 480px) {
+  .button-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .btn {
+    width: 100%;
+  }
 }
