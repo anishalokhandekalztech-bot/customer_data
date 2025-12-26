@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect} from "react";
-import {collection, getDocs} from "firebase/firestore";
+import {collection, getDocs, addDoc, updateDoc, deleteDoc, doc} from "firebase/firestore";
 import { db } from "../lib/firebase";
 
 interface NavItem {
@@ -13,6 +13,7 @@ interface NavItem {
 
 interface DataRow {
   id: number;
+  docId?: string; // Firebase document ID
   name: string;
   phone: string;
   email: string;
@@ -65,6 +66,7 @@ useEffect(() => {
       const d = doc.data();
       return {
         id: index + 1, // required by your existing logic
+        docId: doc.id, // Store the Firebase document ID
         name: d.name || "",
         phone: d.phone || "",
         email: d.email || "",
@@ -100,6 +102,25 @@ useEffect(() => {
     
     setData(newData);
     setSelectedRow(newRow.id);
+    
+    // Add to Firebase
+    addDoc(collection(db, "FormData"), {
+      name: newRow.name,
+      phone: newRow.phone,
+      email: newRow.email,
+      city: newRow.city,
+      services: newRow.services,
+    }).then((docRef) => {
+      // Update the row with the Firebase document ID
+      setData((prevData) =>
+        prevData.map((row) =>
+          row.id === newRow.id ? { ...row, docId: docRef.id } : row
+        )
+      );
+    }).catch((error) => {
+      console.error("Error adding document: ", error);
+      alert("Failed to add row to Firebase. Changes will be local only.");
+    });
     
     // Scroll to the newly added row
     setTimeout(() => {
@@ -168,6 +189,21 @@ useEffect(() => {
       return updatedRow;
     });
 
+    // Update Firebase for each modified cell
+    updatedCells.forEach((value, cellKey) => {
+      const [rowId, field] = cellKey.split("-");
+      const rowToUpdate = updatedData.find((row) => row.id === parseInt(rowId));
+      
+      if (rowToUpdate && rowToUpdate.docId) {
+        updateDoc(doc(db, "FormData", rowToUpdate.docId), {
+          [field]: value,
+        }).catch((error) => {
+          console.error("Error updating document: ", error);
+          alert("Failed to update row in Firebase. Changes will be local only.");
+        });
+      }
+    });
+
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(updatedData);
     setHistory(newHistory);
@@ -224,6 +260,17 @@ useEffect(() => {
   };
 
   const confirmDelete = () => {
+    // Delete from Firebase
+    selectedForDelete.forEach((rowId) => {
+      const rowToDelete = data.find((row) => row.id === rowId);
+      if (rowToDelete && rowToDelete.docId) {
+        deleteDoc(doc(db, "FormData", rowToDelete.docId)).catch((error) => {
+          console.error("Error deleting document: ", error);
+          alert("Failed to delete row from Firebase. Changes will be local only.");
+        });
+      }
+    });
+
     const updatedData = data.filter((row) => !selectedForDelete.has(row.id));
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(updatedData);
