@@ -858,13 +858,15 @@ body {
   }
 
   .table-wrapper {
-    max-height: 400px;
+    flex: 1;
+    min-height: 300px;
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    justify-content: flex-start;
   }
 
   .table {
-    width: auto;
+    width: 100%;
   }
 
   .table-header {
