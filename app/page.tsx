@@ -412,7 +412,11 @@ export default function Home() {
           <div className="header">
             <h1 className="title">Customer Data</h1>
             <div className="button-group">
-              <button onClick={handleAddRow} className="btn btn-add">
+              <button 
+                onClick={handleAddRow} 
+                className="btn btn-add"
+                disabled={deleteMode || updatedCells.size > 0}
+              >
                 + Add Row
               </button>
               {updatedCells.size > 0 && (
@@ -435,14 +439,26 @@ export default function Home() {
                   </button>
                 </>
               ) : updatedCells.size === 0 ? (
-                <button onClick={handleDelete} className="btn btn-delete">
+                <button 
+                  onClick={handleDelete} 
+                  className="btn btn-delete"
+                  disabled={updatedCells.size > 0}
+                >
                   🗑 Delete
                 </button>
               ) : null}
-              <button onClick={handleExport} className="btn btn-export">
+              <button 
+                onClick={handleExport} 
+                className="btn btn-export"
+                disabled={deleteMode || updatedCells.size > 0}
+              >
                  Export
               </button>
-              <button onClick={handleViewInExcel} className="btn btn-excel">
+              <button 
+                onClick={handleViewInExcel} 
+                className="btn btn-excel"
+                disabled={deleteMode || updatedCells.size > 0}
+              >
                  View in Excel
               </button>
               <div className="undo-redo-icons">
@@ -549,6 +565,7 @@ export default function Home() {
                       setFilterField("name");
                       setSortOrder("asc");
                       setShowSortDisclaimer(false);
+                      setSelectedRow(null);
                     }}
                   >
                     Name
@@ -559,6 +576,7 @@ export default function Home() {
                       setFilterField("phone");
                       setSortOrder("asc");
                       setShowSortDisclaimer(false);
+                      setSelectedRow(null);
                     }}
                   >
                     Phone No.
@@ -569,6 +587,7 @@ export default function Home() {
                       setFilterField("email");
                       setSortOrder("asc");
                       setShowSortDisclaimer(false);
+                      setSelectedRow(null);
                     }}
                   >
                     Email
@@ -579,6 +598,7 @@ export default function Home() {
                       setFilterField("city");
                       setSortOrder("asc");
                       setShowSortDisclaimer(false);
+                      setSelectedRow(null);
                     }}
                   >
                     City
@@ -589,6 +609,7 @@ export default function Home() {
                       setFilterField("services");
                       setSortOrder("asc");
                       setShowSortDisclaimer(false);
+                      setSelectedRow(null);
                     }}
                   >
                     Services
