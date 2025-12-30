@@ -58,6 +58,9 @@ export default function Home() {
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState<boolean>(false);
   const [sortDropdownOpen, setSortDropdownOpen] = useState<boolean>(false);
   const [showSortDisclaimer, setShowSortDisclaimer] = useState<boolean>(false);
+  const [showEmptyValueModal, setShowEmptyValueModal] = useState<boolean>(false);
+  const [emptyCells, setEmptyCells] = useState<string[]>([]);
+
 useEffect(() => {
   const fetchData = async () => {
     const snapshot = await getDocs(collection(db, "FormData"));
@@ -83,14 +86,35 @@ useEffect(() => {
 
   fetchData();
 }, []);
+
+useEffect(() => {
+  // Add global click listener to deselect when clicking outside table
+  const handleGlobalClick = (e: MouseEvent) => {
+    const target = e.target as HTMLElement;
+    
+    // Check if click is outside the table wrapper
+    if (tableWrapperRef.current && !tableWrapperRef.current.contains(target)) {
+      setSelectedRow(null);
+      setFilterField("");
+    }
+  };
+
+  // Use capture phase to ensure we catch all clicks
+  document.addEventListener("click", handleGlobalClick, true);
+  
+  return () => {
+    document.removeEventListener("click", handleGlobalClick, true);
+  };
+}, []);
+
   const handleAddRow = () => {
     const newRow: DataRow = {
       id: data.length + 1,
-      name: "New Entry",
-      phone: "555-0000",
-      email: "new@example.com",
-      city: "City",
-      services: "Service",
+      name: "",
+      phone: "",
+      email: "",
+      city: "",
+      services: "",
     };
     const newData = [...data, newRow];
     
@@ -103,24 +127,8 @@ useEffect(() => {
     setData(newData);
     setSelectedRow(newRow.id);
     
-    // Add to Firebase
-    addDoc(collection(db, "FormData"), {
-      name: newRow.name,
-      phone: newRow.phone,
-      email: newRow.email,
-      city: newRow.city,
-      services: newRow.services,
-    }).then((docRef) => {
-      // Update the row with the Firebase document ID
-      setData((prevData) =>
-        prevData.map((row) =>
-          row.id === newRow.id ? { ...row, docId: docRef.id } : row
-        )
-      );
-    }).catch((error) => {
-      console.error("Error adding document: ", error);
-      alert("Failed to add row to Firebase. Changes will be local only.");
-    });
+    // Don't add to Firebase yet - wait for user to fill in all required fields
+    // The row will only be saved to Firebase when user updates values
     
     // Scroll to the newly added row
     setTimeout(() => {
@@ -172,6 +180,51 @@ useEffect(() => {
 
   const handleUpdateChanges = () => {
     if (updatedCells.size === 0) return;
+    
+    // Check for empty values in the changed cells
+    const emptyValuesFound: string[] = [];
+    updatedCells.forEach((value, cellKey) => {
+      if (String(value).trim() === "") {
+        emptyValuesFound.push(cellKey);
+      }
+    });
+    
+    if (emptyValuesFound.length > 0) {
+      setEmptyCells(emptyValuesFound);
+      setShowEmptyValueModal(true);
+      return;
+    }
+
+    // Check if any row being updated has incomplete data (any empty field)
+    const rowsBeingUpdated = new Set<number>();
+    updatedCells.forEach((value, cellKey) => {
+      const [rowId] = cellKey.split("-");
+      rowsBeingUpdated.add(parseInt(rowId));
+    });
+
+    const incompleteRows: string[] = [];
+    rowsBeingUpdated.forEach((rowId) => {
+      const row = data.find((r) => r.id === rowId);
+      if (row) {
+        const hasEmptyField = 
+          String(row.name).trim() === "" ||
+          String(row.phone).trim() === "" ||
+          String(row.email).trim() === "" ||
+          String(row.city).trim() === "" ||
+          String(row.services).trim() === "";
+        
+        if (hasEmptyField) {
+          incompleteRows.push(`Row ${rowId}`);
+        }
+      }
+    });
+
+    if (incompleteRows.length > 0) {
+      setEmptyCells(incompleteRows);
+      setShowEmptyValueModal(true);
+      return;
+    }
+    
     setShowConfirmModal(true);
   };
 
@@ -189,18 +242,21 @@ useEffect(() => {
       return updatedRow;
     });
 
-    // Update Firebase for each modified cell
+    // Update Firebase for each modified cell (skip empty values)
     updatedCells.forEach((value, cellKey) => {
       const [rowId, field] = cellKey.split("-");
       const rowToUpdate = updatedData.find((row) => row.id === parseInt(rowId));
       
-      if (rowToUpdate && rowToUpdate.docId) {
+      // Only send to Firebase if value is not empty
+      if (rowToUpdate && rowToUpdate.docId && String(value).trim() !== "") {
         updateDoc(doc(db, "FormData", rowToUpdate.docId), {
           [field]: value,
         }).catch((error) => {
           console.error("Error updating document: ", error);
           alert("Failed to update row in Firebase. Changes will be local only.");
         });
+      } else if (rowToUpdate && rowToUpdate.docId && String(value).trim() === "") {
+        console.warn(`Skipped empty value for field '${field}' in row ${rowId}`);
       }
     });
 
@@ -219,6 +275,54 @@ useEffect(() => {
     setShowConfirmModal(false);
   };
 
+  const handleEmptyValueClose = () => {
+    // Restore original values for empty cells
+    const newUpdatedCells = new Map(updatedCells);
+    emptyCells.forEach((cellKey) => {
+      newUpdatedCells.delete(cellKey);
+    });
+    setUpdatedCells(newUpdatedCells);
+    setEmptyCells([]);
+    setShowEmptyValueModal(false);
+  };
+
+  const getEmptyCellDetails = () => {
+    return emptyCells.map((cellKey) => {
+      // Check if it's a row identifier (e.g., "Row 1") or a cell identifier (e.g., "1-name")
+      if (cellKey.startsWith("Row ")) {
+        const rowId = parseInt(cellKey.split(" ")[1]);
+        const row = data.find((r) => r.id === rowId);
+        if (row) {
+          const emptyFields = [];
+          if (String(row.name).trim() === "") emptyFields.push("Name");
+          if (String(row.phone).trim() === "") emptyFields.push("Phone");
+          if (String(row.email).trim() === "") emptyFields.push("Email");
+          if (String(row.city).trim() === "") emptyFields.push("City");
+          if (String(row.services).trim() === "") emptyFields.push("Services");
+          
+          return {
+            cellKey,
+            rowId,
+            field: emptyFields.join(", "),
+            originalValue: `Missing: ${emptyFields.join(", ")}`,
+            isRowIncomplete: true,
+          };
+        }
+      } else {
+        const [rowId, field] = cellKey.split("-");
+        const row = data.find((r) => r.id === parseInt(rowId));
+        const originalValue = row ? row[field as keyof DataRow] : "";
+        return {
+          cellKey,
+          rowId: parseInt(rowId),
+          field,
+          originalValue,
+          isRowIncomplete: false,
+        };
+      }
+    }).filter(Boolean);
+  };
+
   const cancelEditing = () => {
     setUpdatedCells(new Map());
     setEditingCell(null);
@@ -228,8 +332,12 @@ useEffect(() => {
 
   const handleDelete = () => {
     if (editingCell) {
-      // Delete the row being edited
-      const updatedData = data.filter((row) => row.id !== editingCell.rowId);
+      // Delete the row being edited and reassign serial numbers
+      const filteredData = data.filter((row) => row.id !== editingCell.rowId);
+      const updatedData = filteredData.map((row, index) => ({
+        ...row,
+        id: index + 1, // Reassign serial numbers sequentially
+      }));
       const newHistory = history.slice(0, historyIndex + 1);
       newHistory.push(updatedData);
       setHistory(newHistory);
@@ -271,7 +379,13 @@ useEffect(() => {
       }
     });
 
-    const updatedData = data.filter((row) => !selectedForDelete.has(row.id));
+    // Filter out deleted rows and reassign serial numbers
+    const filteredData = data.filter((row) => !selectedForDelete.has(row.id));
+    const updatedData = filteredData.map((row, index) => ({
+      ...row,
+      id: index + 1, // Reassign serial numbers sequentially
+    }));
+    
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(updatedData);
     setHistory(newHistory);
@@ -723,6 +837,38 @@ useEffect(() => {
           </div>
       </div>
     </div>
+
+    {/* Empty Value Modal */}
+    {showEmptyValueModal && (
+      <div className="modal-overlay">
+        <div className="modal-content">
+          <h2 className="modal-title">⚠ Cannot Update - Incomplete Entry</h2>
+          <p className="modal-message">Please fill all fields before updating. The following rows have missing data:</p>
+          <div className="empty-cells-list">
+            {getEmptyCellDetails().map((cell) => (
+              <div key={cell.cellKey} className="empty-cell-item">
+                {cell.isRowIncomplete ? (
+                  <>
+                    <strong>{cell.cellKey}:</strong> 
+                    <span className="original-value">{cell.originalValue}</span>
+                  </>
+                ) : (
+                  <>
+                    <strong>Row {cell.rowId}, {cell.field.charAt(0).toUpperCase() + cell.field.slice(1)}:</strong> 
+                    <span className="original-value">"{cell.originalValue}"</span>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="modal-buttons">
+            <button onClick={handleEmptyValueClose} className="btn btn-confirm">
+              OK
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
 
     {/* Confirmation Modal */}
     {showConfirmModal && (

@@ -652,12 +652,12 @@ body {
 }
 
 .selected-column-cell {
-  border-left: 2px solid #ff3f00 !important;
-  border-right: 2px solid #ff3f00 !important;
+  border-left: 3px solid #ff3f00 !important;
+  border-right: 3px solid #ff3f00 !important;
 }
 
 .table-row:last-child .selected-column-cell {
-  border-bottom: 2px solid #ff3f00 !important;
+  border-bottom: 3px solid #ff3f00 !important;
 }
 
 .table-row {
@@ -1215,6 +1215,34 @@ body {
   font-weight: 600;
   cursor: pointer;
   transition: background-color 0.2s ease;
+}
+
+.empty-cells-list {
+  background-color: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 6px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.empty-cell-item {
+  padding: 0.5rem 0;
+  font-size: 13px;
+  color: var(--text-dark);
+  line-height: 1.5;
+}
+
+.empty-cell-item strong {
+  color: #a74205;
+  font-weight: 600;
+}
+
+.empty-cell-item .original-value {
+  color: #155724;
+  font-weight: 500;
+  margin-left: 0.3rem;
 }
 
 /* Responsive Design for Small Screen Heights */
