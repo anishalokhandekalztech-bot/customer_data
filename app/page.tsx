@@ -165,11 +165,90 @@ useEffect(() => {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, rowId: number, field: string) => {
+    const fields = ["name", "phone", "email", "city", "services"];
+    const currentIndex = fields.indexOf(field);
+
     if (e.key === "Enter") {
       handleCellBlur(rowId, field);
     } else if (e.key === "Escape") {
       setEditingCell(null);
       setEditValue("");
+    } else if (e.key === "ArrowRight" && currentIndex < fields.length - 1) {
+      e.preventDefault();
+      // Save current cell first
+      const originalValue = data.find(row => row.id === rowId)?.[field as keyof DataRow];
+      if (String(originalValue) !== String(editValue)) {
+        const cellKey = `${rowId}-${field}`;
+        const newUpdatedCells = new Map(updatedCells);
+        newUpdatedCells.set(cellKey, editValue);
+        setUpdatedCells(newUpdatedCells);
+      }
+      // Move to next field
+      const nextField = fields[currentIndex + 1];
+      const row = data.find(r => r.id === rowId);
+      if (row) {
+        const cellKey = `${rowId}-${nextField}`;
+        const nextEditVal = updatedCells.has(cellKey) ? updatedCells.get(cellKey) : row[nextField as keyof DataRow];
+        setEditingCell({ rowId, field: nextField });
+        setEditValue(nextEditVal || "");
+      }
+    } else if (e.key === "ArrowLeft" && currentIndex > 0) {
+      e.preventDefault();
+      // Save current cell first
+      const originalValue = data.find(row => row.id === rowId)?.[field as keyof DataRow];
+      if (String(originalValue) !== String(editValue)) {
+        const cellKey = `${rowId}-${field}`;
+        const newUpdatedCells = new Map(updatedCells);
+        newUpdatedCells.set(cellKey, editValue);
+        setUpdatedCells(newUpdatedCells);
+      }
+      // Move to previous field
+      const prevField = fields[currentIndex - 1];
+      const row = data.find(r => r.id === rowId);
+      if (row) {
+        const cellKey = `${rowId}-${prevField}`;
+        const prevEditVal = updatedCells.has(cellKey) ? updatedCells.get(cellKey) : row[prevField as keyof DataRow];
+        setEditingCell({ rowId, field: prevField });
+        setEditValue(prevEditVal || "");
+      }
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      // Save current cell first
+      const originalValue = data.find(row => row.id === rowId)?.[field as keyof DataRow];
+      if (String(originalValue) !== String(editValue)) {
+        const cellKey = `${rowId}-${field}`;
+        const newUpdatedCells = new Map(updatedCells);
+        newUpdatedCells.set(cellKey, editValue);
+        setUpdatedCells(newUpdatedCells);
+      }
+      // Move to next row with same field
+      const nextRow = data.find(r => r.id === rowId + 1);
+      if (nextRow) {
+        const cellKey = `${nextRow.id}-${field}`;
+        const nextEditVal = updatedCells.has(cellKey) ? updatedCells.get(cellKey) : nextRow[field as keyof DataRow];
+        setEditingCell({ rowId: nextRow.id, field });
+        setEditValue(nextEditVal || "");
+      }
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      // Save current cell first
+      const originalValue = data.find(row => row.id === rowId)?.[field as keyof DataRow];
+      if (String(originalValue) !== String(editValue)) {
+        const cellKey = `${rowId}-${field}`;
+        const newUpdatedCells = new Map(updatedCells);
+        newUpdatedCells.set(cellKey, editValue);
+        setUpdatedCells(newUpdatedCells);
+      }
+      // Move to previous row with same field
+      if (rowId > 1) {
+        const prevRow = data.find(r => r.id === rowId - 1);
+        if (prevRow) {
+          const cellKey = `${prevRow.id}-${field}`;
+          const prevEditVal = updatedCells.has(cellKey) ? updatedCells.get(cellKey) : prevRow[field as keyof DataRow];
+          setEditingCell({ rowId: prevRow.id, field });
+          setEditValue(prevEditVal || "");
+        }
+      }
     }
   };
 
