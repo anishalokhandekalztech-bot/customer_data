@@ -140,7 +140,10 @@ useEffect(() => {
 
   const handleCellClick = (rowId: number, field: string, value: any) => {
     setEditingCell({ rowId, field });
-    setEditValue(value);
+    // Use the updated value from updatedCells if it exists, otherwise use the original row value
+    const cellKey = `${rowId}-${field}`;
+    const editVal = updatedCells.has(cellKey) ? updatedCells.get(cellKey) : value;
+    setEditValue(editVal || "");
   };
 
   const handleCellChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -195,7 +198,7 @@ useEffect(() => {
       return;
     }
 
-    // Check if any row being updated has incomplete data (any empty field)
+    // Check if any row being updated will have incomplete data after updates
     const rowsBeingUpdated = new Set<number>();
     updatedCells.forEach((value, cellKey) => {
       const [rowId] = cellKey.split("-");
@@ -206,12 +209,22 @@ useEffect(() => {
     rowsBeingUpdated.forEach((rowId) => {
       const row = data.find((r) => r.id === rowId);
       if (row) {
+        // Build the final row state after applying updates
+        const finalRow = { ...row };
+        updatedCells.forEach((value, cellKey) => {
+          const [cellRowId, field] = cellKey.split("-");
+          if (parseInt(cellRowId) === rowId) {
+            finalRow[field as keyof DataRow] = value;
+          }
+        });
+
+        // Check if the final row has any empty fields
         const hasEmptyField = 
-          String(row.name).trim() === "" ||
-          String(row.phone).trim() === "" ||
-          String(row.email).trim() === "" ||
-          String(row.city).trim() === "" ||
-          String(row.services).trim() === "";
+          String(finalRow.name).trim() === "" ||
+          String(finalRow.phone).trim() === "" ||
+          String(finalRow.email).trim() === "" ||
+          String(finalRow.city).trim() === "" ||
+          String(finalRow.services).trim() === "";
         
         if (hasEmptyField) {
           incompleteRows.push(`Row ${rowId}`);
@@ -242,33 +255,65 @@ useEffect(() => {
       return updatedRow;
     });
 
-    // Update Firebase for each modified cell (skip empty values)
+    // Track promises for Firebase operations
+    const firebasePromises: Promise<any>[] = [];
+
+    // Update Firebase for each modified cell
     updatedCells.forEach((value, cellKey) => {
       const [rowId, field] = cellKey.split("-");
       const rowToUpdate = updatedData.find((row) => row.id === parseInt(rowId));
       
-      // Only send to Firebase if value is not empty
-      if (rowToUpdate && rowToUpdate.docId && String(value).trim() !== "") {
-        updateDoc(doc(db, "FormData", rowToUpdate.docId), {
-          [field]: value,
-        }).catch((error) => {
-          console.error("Error updating document: ", error);
-          alert("Failed to update row in Firebase. Changes will be local only.");
-        });
+      if (rowToUpdate && String(value).trim() !== "") {
+        if (rowToUpdate.docId) {
+          // Update existing document
+          const promise = updateDoc(doc(db, "FormData", rowToUpdate.docId), {
+            [field]: value,
+          }).catch((error) => {
+            console.error("Error updating document: ", error);
+            alert("Failed to update row in Firebase. Changes will be local only.");
+          });
+          firebasePromises.push(promise);
+        } else {
+          // New row without docId - we'll handle this below
+        }
       } else if (rowToUpdate && rowToUpdate.docId && String(value).trim() === "") {
         console.warn(`Skipped empty value for field '${field}' in row ${rowId}`);
       }
     });
 
-    const newHistory = history.slice(0, historyIndex + 1);
-    newHistory.push(updatedData);
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
+    // Handle new rows (without docId) - add them to Firebase
+    const newRows = updatedData.filter((row) => !row.docId);
+    newRows.forEach((newRow) => {
+      const promise = addDoc(collection(db, "FormData"), {
+        name: newRow.name,
+        phone: newRow.phone,
+        email: newRow.email,
+        city: newRow.city,
+        services: newRow.services,
+      })
+        .then((docRef) => {
+          // Update the row with the Firebase document ID
+          newRow.docId = docRef.id;
+        })
+        .catch((error) => {
+          console.error("Error adding document: ", error);
+          alert("Failed to add row to Firebase. Changes will be local only.");
+        });
+      firebasePromises.push(promise);
+    });
 
-    setData(updatedData);
-    setUpdatedCells(new Map());
-    setShowConfirmModal(false);
-    setEditingCell(null);
+    // Wait for all Firebase operations to complete, then update local state
+    Promise.all(firebasePromises).then(() => {
+      const newHistory = history.slice(0, historyIndex + 1);
+      newHistory.push(updatedData);
+      setHistory(newHistory);
+      setHistoryIndex(newHistory.length - 1);
+
+      setData(updatedData);
+      setUpdatedCells(new Map());
+      setShowConfirmModal(false);
+      setEditingCell(null);
+    });
   };
 
   const cancelUpdate = () => {
@@ -293,12 +338,22 @@ useEffect(() => {
         const rowId = parseInt(cellKey.split(" ")[1]);
         const row = data.find((r) => r.id === rowId);
         if (row) {
+          // Build the final row state after applying updates
+          const finalRow = { ...row };
+          updatedCells.forEach((value, cellKey) => {
+            const [cellRowId, field] = cellKey.split("-");
+            if (parseInt(cellRowId) === rowId) {
+              finalRow[field as keyof DataRow] = value;
+            }
+          });
+
+          // Find which fields are empty in the final state
           const emptyFields = [];
-          if (String(row.name).trim() === "") emptyFields.push("Name");
-          if (String(row.phone).trim() === "") emptyFields.push("Phone");
-          if (String(row.email).trim() === "") emptyFields.push("Email");
-          if (String(row.city).trim() === "") emptyFields.push("City");
-          if (String(row.services).trim() === "") emptyFields.push("Services");
+          if (String(finalRow.name).trim() === "") emptyFields.push("Name");
+          if (String(finalRow.phone).trim() === "") emptyFields.push("Phone");
+          if (String(finalRow.email).trim() === "") emptyFields.push("Email");
+          if (String(finalRow.city).trim() === "") emptyFields.push("City");
+          if (String(finalRow.services).trim() === "") emptyFields.push("Services");
           
           return {
             cellKey,
