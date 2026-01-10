@@ -7,13 +7,13 @@ import { getFirestore } from "firebase/firestore";
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyD4Zl7TM6k6hWVbWpzd0AQvvybohTMvrzU",
-  authDomain: "foundersfirstdata.firebaseapp.com",
-  projectId: "foundersfirstdata",
-  storageBucket: "foundersfirstdata.firebasestorage.app",
-  messagingSenderId: "803184180442",
-  appId: "1:803184180442:web:202142d155f3c1c42339e3",
-  measurementId: "G-7S8EMX4N9T"
+  apiKey: "AIzaSyB6GcF17uqg7jGqfTDutpnVKaHdi5cybZI",
+  authDomain: "founders-first-leads-4914d.firebaseapp.com",
+  projectId: "founders-first-leads-4914d",
+  storageBucket: "founders-first-leads-4914d.firebasestorage.app",
+  messagingSenderId: "436923004746",
+  appId: "1:436923004746:web:74b42660a82a2b2157b3b3",
+  measurementId: "G-6YTJTJH3ZQ"
 };
 
 // Initialize Firebase app (avoid double initialization during SSR/HMR)

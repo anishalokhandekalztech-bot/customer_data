@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect} from "react";
-import {collection, getDocs, addDoc, updateDoc, deleteDoc, doc} from "firebase/firestore";
+import {collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp} from "firebase/firestore";
 import { db } from "../lib/firebase";
 
 interface NavItem {
@@ -34,13 +34,13 @@ export default function Home() {
   const tableWrapperRef = useRef<HTMLDivElement>(null);
 
   const navItems: NavItem[] = [
-    { id: "dashboard", label: "Home" },
-    { id: "reports", label: "About Us" },
-    { id: "analytics", label: "Start a Business", hasDropdown: true },
-    { id: "settings", label: "Trademark Registration", hasDropdown: true },
-    { id: "users", label: "Annual Compliance", hasDropdown: true },
-    { id: "support", label: "Other Services", hasDropdown: true },
-    { id: "customers", label: "Form Enteries" },
+    // { id: "dashboard", label: "Home" },
+    // { id: "reports", label: "About Us" },
+    // { id: "analytics", label: "Start a Business", hasDropdown: true },
+    // { id: "settings", label: "Trademark Registration", hasDropdown: true },
+    // { id: "users", label: "Annual Compliance", hasDropdown: true },
+    // { id: "support", label: "Other Services", hasDropdown: true },
+    // { id: "customers", label: "Form Enteries" },
   ];
   const initialData: DataRow[] = [];
 
@@ -65,7 +65,7 @@ export default function Home() {
 
 useEffect(() => {
   const fetchData = async () => {
-    const snapshot = await getDocs(collection(db, "FormData"));
+    const snapshot = await getDocs(collection(db, "form_submissions"));
 
     const firebaseData: DataRow[] = snapshot.docs.map((doc, index) => {
       const d = doc.data();
@@ -73,12 +73,12 @@ useEffect(() => {
         id: index + 1, // required by your existing logic
         docId: doc.id, // Store the Firebase document ID
         salutation: d.salutation || "",
-        firstName: d.firstName || "",
-        lastName: d.lastName || "",
+        firstName: d.first_name || "",
+        lastName: d.last_name || "",
         phone: d.phone || "",
         email: d.email || "",
         city: d.city || "",
-        services: d.services || "",
+        services: d.service_name || "",
       };
     });
 
@@ -353,7 +353,7 @@ useEffect(() => {
       if (rowToUpdate && String(value).trim() !== "") {
         if (rowToUpdate.docId) {
           // Update existing document
-          const promise = updateDoc(doc(db, "FormData", rowToUpdate.docId), {
+          const promise = updateDoc(doc(db, "form_submissions", rowToUpdate.docId), {
             [field]: value,
           }).catch((error) => {
             console.error("Error updating document: ", error);
@@ -371,14 +371,15 @@ useEffect(() => {
     // Handle new rows (without docId) - add them to Firebase
     const newRows = updatedData.filter((row) => !row.docId);
     newRows.forEach((newRow) => {
-      const promise = addDoc(collection(db, "FormData"), {
+      const promise = addDoc(collection(db, "form_submissions"), {
         salutation: newRow.salutation,
-        firstName: newRow.firstName,
-        lastName: newRow.lastName,
+        first_name: newRow.firstName,
+        last_name: newRow.lastName,
         phone: newRow.phone,
         email: newRow.email,
         city: newRow.city,
-        services: newRow.services,
+        service_name: newRow.services,
+        created_at: serverTimestamp(),
       })
         .then((docRef) => {
           // Update the row with the Firebase document ID
@@ -518,7 +519,7 @@ useEffect(() => {
     selectedForDelete.forEach((rowId) => {
       const rowToDelete = data.find((row) => row.id === rowId);
       if (rowToDelete && rowToDelete.docId) {
-        deleteDoc(doc(db, "FormData", rowToDelete.docId)).catch((error) => {
+        deleteDoc(doc(db, "form_submissions", rowToDelete.docId)).catch((error) => {
           console.error("Error deleting document: ", error);
           alert("Failed to delete row from Firebase. Changes will be local only.");
         });
@@ -803,7 +804,7 @@ useEffect(() => {
                 className="search-input"
               />
             </div>
-            <div className="filter-sort-container">
+            {/* <div className="filter-sort-container">
               <div className="sort-dropdown-container">
                 <button
                   onClick={() => {
@@ -848,7 +849,7 @@ useEffect(() => {
                   </div>
                 )}
               </div>
-            </div>
+            </div> */}
 
             {(searchTerm || filterField) && (
               <button
