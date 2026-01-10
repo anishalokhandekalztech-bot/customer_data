@@ -14,7 +14,9 @@ interface NavItem {
 interface DataRow {
   id: number;
   docId?: string; // Firebase document ID
-  name: string;
+  salutation: string;
+  firstName: string;
+  lastName: string;
   phone: string;
   email: string;
   city: string;
@@ -70,7 +72,9 @@ useEffect(() => {
       return {
         id: index + 1, // required by your existing logic
         docId: doc.id, // Store the Firebase document ID
-        name: d.name || "",
+        salutation: d.salutation || "",
+        firstName: d.firstName || "",
+        lastName: d.lastName || "",
         phone: d.phone || "",
         email: d.email || "",
         city: d.city || "",
@@ -110,7 +114,9 @@ useEffect(() => {
   const handleAddRow = () => {
     const newRow: DataRow = {
       id: data.length + 1,
-      name: "",
+      salutation: "",
+      firstName: "",
+      lastName: "",
       phone: "",
       email: "",
       city: "",
@@ -165,7 +171,7 @@ useEffect(() => {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, rowId: number, field: string) => {
-    const fields = ["name", "phone", "email", "city", "services"];
+    const fields = ["salutation", "firstName", "lastName", "phone", "email", "city", "services"];
     const currentIndex = fields.indexOf(field);
 
     if (e.key === "Enter") {
@@ -299,7 +305,9 @@ useEffect(() => {
 
         // Check if the final row has any empty fields
         const hasEmptyField = 
-          String(finalRow.name).trim() === "" ||
+          String(finalRow.salutation).trim() === "" ||
+          String(finalRow.firstName).trim() === "" ||
+          String(finalRow.lastName).trim() === "" ||
           String(finalRow.phone).trim() === "" ||
           String(finalRow.email).trim() === "" ||
           String(finalRow.city).trim() === "" ||
@@ -364,7 +372,9 @@ useEffect(() => {
     const newRows = updatedData.filter((row) => !row.docId);
     newRows.forEach((newRow) => {
       const promise = addDoc(collection(db, "FormData"), {
-        name: newRow.name,
+        salutation: newRow.salutation,
+        firstName: newRow.firstName,
+        lastName: newRow.lastName,
         phone: newRow.phone,
         email: newRow.email,
         city: newRow.city,
@@ -428,7 +438,9 @@ useEffect(() => {
 
           // Find which fields are empty in the final state
           const emptyFields = [];
-          if (String(finalRow.name).trim() === "") emptyFields.push("Name");
+          if (String(finalRow.salutation).trim() === "") emptyFields.push("Salutation");
+          if (String(finalRow.firstName).trim() === "") emptyFields.push("First Name");
+          if (String(finalRow.lastName).trim() === "") emptyFields.push("Last Name");
           if (String(finalRow.phone).trim() === "") emptyFields.push("Phone");
           if (String(finalRow.email).trim() === "") emptyFields.push("Email");
           if (String(finalRow.city).trim() === "") emptyFields.push("City");
@@ -563,7 +575,9 @@ useEffect(() => {
   const handleExport = () => {
     const jsonData = data.map((row) => ({
       "Sr No.": row.id,
-      "Name": row.name,
+      "Salutation": row.salutation,
+      "First Name": row.firstName,
+      "Last Name": row.lastName,
       "Phone No.": row.phone,
       "Email": row.email,
       "City": row.city,
@@ -581,10 +595,12 @@ useEffect(() => {
 
   const handleViewInExcel = () => {
     const csv = [
-      ["Sr No.", "Name", "Phone No.", "Email", "City", "Services"],
+      ["Sr No.", "Salutation", "First Name", "Last Name", "Phone No.", "Email", "City", "Services"],
       ...data.map((row) => [
         row.id,
-        row.name,
+        row.salutation,
+        row.firstName,
+        row.lastName,
         row.phone,
         row.email,
         row.city,
@@ -854,15 +870,37 @@ useEffect(() => {
                 <tr>
                   <th className="table-header">Sr No.</th>
                   <th 
-                    className={`table-header column-selectable ${filterField === "name" ? "selected-column" : ""}`}
+                    className={`table-header column-selectable ${filterField === "salutation" ? "selected-column" : ""}`}
                     onDoubleClick={() => {
-                      setFilterField("name");
+                      setFilterField("salutation");
                       setSortOrder("asc");
                       setShowSortDisclaimer(false);
                       setSelectedRow(null);
                     }}
                   >
-                    Name
+                    Salutation
+                  </th>
+                  <th 
+                    className={`table-header column-selectable ${filterField === "firstName" ? "selected-column" : ""}`}
+                    onDoubleClick={() => {
+                      setFilterField("firstName");
+                      setSortOrder("asc");
+                      setShowSortDisclaimer(false);
+                      setSelectedRow(null);
+                    }}
+                  >
+                    First Name
+                  </th>
+                  <th 
+                    className={`table-header column-selectable ${filterField === "lastName" ? "selected-column" : ""}`}
+                    onDoubleClick={() => {
+                      setFilterField("lastName");
+                      setSortOrder("asc");
+                      setShowSortDisclaimer(false);
+                      setSelectedRow(null);
+                    }}
+                  >
+                    Last Name
                   </th>
                   <th 
                     className={`table-header column-selectable ${filterField === "phone" ? "selected-column" : ""}`}
@@ -933,10 +971,11 @@ useEffect(() => {
                         <div className="table-cell-content">{row.id}</div>
                       </td>
                     )}
-                    {["name", "phone", "email", "city", "services"].map((field) => {
+                    {["salutation", "firstName", "lastName", "phone", "email", "city", "services"].map((field) => {
                       const cellKey = `${row.id}-${field}`;
                       const isUpdated = updatedCells.has(cellKey);
                       const isColumnSelected = filterField === field;
+                      const salutationOptions = ["Mr.", "Mrs.", "Ms.", "Dr.", "Prof."];
                       return (
                       <td
                         key={cellKey}
@@ -946,15 +985,30 @@ useEffect(() => {
                         }
                       >
                         {editingCell?.rowId === row.id && editingCell?.field === field ? (
-                          <input
-                            type="text"
-                            value={editValue}
-                            onChange={handleCellChange}
-                            onBlur={() => handleCellBlur(row.id, field)}
-                            onKeyDown={(e) => handleKeyDown(e, row.id, field)}
-                            autoFocus
-                            className="table-input"
-                          />
+                          field === "salutation" ? (
+                            <select
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              onBlur={() => handleCellBlur(row.id, field)}
+                              autoFocus
+                              className="table-input"
+                            >
+                              <option value="">Select Salutation</option>
+                              {salutationOptions.map((option) => (
+                                <option key={option} value={option}>{option}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              type="text"
+                              value={editValue}
+                              onChange={handleCellChange}
+                              onBlur={() => handleCellBlur(row.id, field)}
+                              onKeyDown={(e) => handleKeyDown(e, row.id, field)}
+                              autoFocus
+                              className="table-input"
+                            />
+                          )
                         ) : (
                           <div className="table-cell-content">{isUpdated ? updatedCells.get(cellKey) : row[field as keyof DataRow]}</div>
                         )}
