@@ -21,6 +21,7 @@ interface DataRow {
   email: string;
   city: string;
   services: string;
+  created_at:string;
 }
 
 interface EditingCell {
@@ -69,6 +70,12 @@ useEffect(() => {
 
     const firebaseData: DataRow[] = snapshot.docs.map((doc, index) => {
       const d = doc.data();
+
+      let formattedDate = "-";
+      if (d.created_at?.toDate) {
+      formattedDate = d.created_at.toDate().toLocaleString();
+      }
+
       return {
         id: index + 1, // required by your existing logic
         docId: doc.id, // Store the Firebase document ID
@@ -79,6 +86,7 @@ useEffect(() => {
         email: d.email || "",
         city: d.city || "",
         services: d.service_name || "",
+        created_at: formattedDate || "",
       };
     });
 
@@ -121,6 +129,7 @@ useEffect(() => {
       email: "",
       city: "",
       services: "",
+      created_at:"",
     };
     const newData = [...data, newRow];
     
@@ -311,8 +320,7 @@ useEffect(() => {
           String(finalRow.phone).trim() === "" ||
           String(finalRow.email).trim() === "" ||
           String(finalRow.city).trim() === "" ||
-          String(finalRow.services).trim() === "";
-        
+          String(finalRow.services).trim() === "";        
         if (hasEmptyField) {
           incompleteRows.push(`Row ${rowId}`);
         }
@@ -583,6 +591,7 @@ useEffect(() => {
       "Email": row.email,
       "City": row.city,
       "Services": row.services,
+      "Created_at":row.created_at,
     }));
 
     const jsonString = JSON.stringify(jsonData, null, 2);
@@ -596,7 +605,7 @@ useEffect(() => {
 
   const handleViewInExcel = () => {
     const csv = [
-      ["Sr No.", "Salutation", "First Name", "Last Name", "Phone No.", "Email", "City", "Services"],
+      ["Sr No.", "Salutation", "First Name", "Last Name", "Phone No.", "Email", "City", "Services", "Created_at"],
       ...data.map((row) => [
         row.id,
         row.salutation,
@@ -606,6 +615,7 @@ useEffect(() => {
         row.email,
         row.city,
         row.services,
+        row.created_at,
       ]),
     ]
       .map((row) => row.map((cell) => `"${cell}"`).join(","))
@@ -947,6 +957,7 @@ useEffect(() => {
                   >
                     Services
                   </th>
+                  <th className={`table-header column-selectable ${filterField === "created_at" ? "selected-column" : ""}`}>Date & Time</th>
                 </tr>
               </thead>
               <tbody>
@@ -1016,6 +1027,14 @@ useEffect(() => {
                       </td>
                     );
                     })}
+                    
+                    {/* READ-ONLY DATE COLUMN */}
+                    <td className="table-cell">
+                      <div className="table-cell-content">
+                        {row.created_at || "-"}
+                      </div>
+                    </td>
+
                   </tr>
                 ))}
               </tbody>
