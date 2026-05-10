@@ -642,12 +642,24 @@ useEffect(() => {
     .sort((a, b) => {
       if (!filterField) return 0;
 
-      const fieldA = String(a[filterField as keyof DataRow]).toLowerCase();
-      const fieldB = String(b[filterField as keyof DataRow]).toLowerCase();
-
       let comparison = 0;
-      if (fieldA < fieldB) comparison = -1;
-      if (fieldA > fieldB) comparison = 1;
+
+      if (filterField === "created_at") {
+        const dateA = new Date(a.created_at).getTime();
+        const dateB = new Date(b.created_at).getTime();
+        
+        const timeA = isNaN(dateA) ? 0 : dateA;
+        const timeB = isNaN(dateB) ? 0 : dateB;
+
+        if (timeA < timeB) comparison = -1;
+        if (timeA > timeB) comparison = 1;
+      } else {
+        const fieldA = String(a[filterField as keyof DataRow]).toLowerCase();
+        const fieldB = String(b[filterField as keyof DataRow]).toLowerCase();
+
+        if (fieldA < fieldB) comparison = -1;
+        if (fieldA > fieldB) comparison = 1;
+      }
 
       return sortOrder === "asc" ? comparison : -comparison;
     });
@@ -882,88 +894,98 @@ useEffect(() => {
                   <th className="table-header">Sr No.</th>
                   <th 
                     className={`table-header column-selectable ${filterField === "salutation" ? "selected-column" : ""}`}
-                    onDoubleClick={() => {
-                      setFilterField("salutation");
-                      setSortOrder("asc");
+                    onClick={() => {
+                      if (filterField === "salutation") setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                      else { setFilterField("salutation"); setSortOrder("asc"); }
                       setShowSortDisclaimer(false);
                       setSelectedRow(null);
                     }}
                   >
-                    Salutation
+                    Salutation {filterField === "salutation" && (sortOrder === "asc" ? "↑" : "↓")}
                   </th>
                   <th 
                     className={`table-header column-selectable ${filterField === "firstName" ? "selected-column" : ""}`}
-                    onDoubleClick={() => {
-                      setFilterField("firstName");
-                      setSortOrder("asc");
+                    onClick={() => {
+                      if (filterField === "firstName") setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                      else { setFilterField("firstName"); setSortOrder("asc"); }
                       setShowSortDisclaimer(false);
                       setSelectedRow(null);
                     }}
                   >
-                    First Name
+                    First Name {filterField === "firstName" && (sortOrder === "asc" ? "↑" : "↓")}
                   </th>
                   <th 
                     className={`table-header column-selectable ${filterField === "lastName" ? "selected-column" : ""}`}
-                    onDoubleClick={() => {
-                      setFilterField("lastName");
-                      setSortOrder("asc");
+                    onClick={() => {
+                      if (filterField === "lastName") setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                      else { setFilterField("lastName"); setSortOrder("asc"); }
                       setShowSortDisclaimer(false);
                       setSelectedRow(null);
                     }}
                   >
-                    Last Name
+                    Last Name {filterField === "lastName" && (sortOrder === "asc" ? "↑" : "↓")}
                   </th>
                   <th 
                     className={`table-header column-selectable ${filterField === "phone" ? "selected-column" : ""}`}
-                    onDoubleClick={() => {
-                      setFilterField("phone");
-                      setSortOrder("asc");
+                    onClick={() => {
+                      if (filterField === "phone") setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                      else { setFilterField("phone"); setSortOrder("asc"); }
                       setShowSortDisclaimer(false);
                       setSelectedRow(null);
                     }}
                   >
-                    Phone No.
+                    Phone No. {filterField === "phone" && (sortOrder === "asc" ? "↑" : "↓")}
                   </th>
                   <th 
                     className={`table-header column-selectable ${filterField === "email" ? "selected-column" : ""}`}
-                    onDoubleClick={() => {
-                      setFilterField("email");
-                      setSortOrder("asc");
+                    onClick={() => {
+                      if (filterField === "email") setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                      else { setFilterField("email"); setSortOrder("asc"); }
                       setShowSortDisclaimer(false);
                       setSelectedRow(null);
                     }}
                   >
-                    Email
+                    Email {filterField === "email" && (sortOrder === "asc" ? "↑" : "↓")}
                   </th>
                   <th 
                     className={`table-header column-selectable ${filterField === "city" ? "selected-column" : ""}`}
-                    onDoubleClick={() => {
-                      setFilterField("city");
-                      setSortOrder("asc");
+                    onClick={() => {
+                      if (filterField === "city") setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                      else { setFilterField("city"); setSortOrder("asc"); }
                       setShowSortDisclaimer(false);
                       setSelectedRow(null);
                     }}
                   >
-                    City
+                    City {filterField === "city" && (sortOrder === "asc" ? "↑" : "↓")}
                   </th>
                   <th 
                     className={`table-header column-selectable ${filterField === "services" ? "selected-column" : ""}`}
-                    onDoubleClick={() => {
-                      setFilterField("services");
-                      setSortOrder("asc");
+                    onClick={() => {
+                      if (filterField === "services") setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                      else { setFilterField("services"); setSortOrder("asc"); }
                       setShowSortDisclaimer(false);
                       setSelectedRow(null);
                     }}
                   >
-                    Services
+                    Services {filterField === "services" && (sortOrder === "asc" ? "↑" : "↓")}
                   </th>
-                  <th className={`table-header column-selectable ${filterField === "created_at" ? "selected-column" : ""}`}>Date & Time</th>
+                  <th 
+                    className={`table-header column-selectable ${filterField === "created_at" ? "selected-column" : ""}`}
+                    onClick={() => {
+                      if (filterField === "created_at") setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                      else { setFilterField("created_at"); setSortOrder("desc"); }
+                      setShowSortDisclaimer(false);
+                      setSelectedRow(null);
+                    }}
+                  >
+                    Date & Time {filterField === "created_at" && (sortOrder === "asc" ? "↑" : "↓")}
+                  </th>
                 </tr>
               </thead>
               <tbody>
 
 
-                {filteredData.map((row) => (
+                {filteredData.map((row, index) => (
                   <tr 
                     key={row.id} 
                     className={`table-row ${editingCell?.rowId === row.id ? "editing" : ""} ${deleteMode && selectedForDelete.has(row.id) ? "selected-for-delete" : ""} ${selectedRow === row.id ? "selected" : ""}`}
@@ -980,7 +1002,7 @@ useEffect(() => {
                       </td>
                     ) : (
                       <td className="table-cell table-cell-id">
-                        <div className="table-cell-content">{row.id}</div>
+                        <div className="table-cell-content">{index + 1}</div>
                       </td>
                     )}
                     {["salutation", "firstName", "lastName", "phone", "email", "city", "services"].map((field) => {
