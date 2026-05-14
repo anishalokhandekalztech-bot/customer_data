@@ -107,7 +107,6 @@ useEffect(() => {
     // Check if click is outside the table wrapper
     if (tableWrapperRef.current && !tableWrapperRef.current.contains(target)) {
       setSelectedRow(null);
-      setFilterField("");
     }
   };
 
@@ -269,10 +268,6 @@ useEffect(() => {
 
   const handleRowSelect = (rowId: number) => {
     setSelectedRow(selectedRow === rowId ? null : rowId);
-    // Deselect column when selecting a row
-    if (selectedRow !== rowId) {
-      setFilterField("");
-    }
   };
 
   const handleUpdateChanges = () => {
@@ -895,7 +890,10 @@ useEffect(() => {
                   <th 
                     className={`table-header column-selectable ${filterField === "salutation" ? "selected-column" : ""}`}
                     onClick={() => {
-                      if (filterField === "salutation") setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                      if (filterField === "salutation") {
+                        if (sortOrder === "asc") setSortOrder("desc");
+                        else setFilterField("");
+                      }
                       else { setFilterField("salutation"); setSortOrder("asc"); }
                       setShowSortDisclaimer(false);
                       setSelectedRow(null);
@@ -906,7 +904,10 @@ useEffect(() => {
                   <th 
                     className={`table-header column-selectable ${filterField === "firstName" ? "selected-column" : ""}`}
                     onClick={() => {
-                      if (filterField === "firstName") setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                      if (filterField === "firstName") {
+                        if (sortOrder === "asc") setSortOrder("desc");
+                        else setFilterField("");
+                      }
                       else { setFilterField("firstName"); setSortOrder("asc"); }
                       setShowSortDisclaimer(false);
                       setSelectedRow(null);
@@ -917,7 +918,10 @@ useEffect(() => {
                   <th 
                     className={`table-header column-selectable ${filterField === "lastName" ? "selected-column" : ""}`}
                     onClick={() => {
-                      if (filterField === "lastName") setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                      if (filterField === "lastName") {
+                        if (sortOrder === "asc") setSortOrder("desc");
+                        else setFilterField("");
+                      }
                       else { setFilterField("lastName"); setSortOrder("asc"); }
                       setShowSortDisclaimer(false);
                       setSelectedRow(null);
@@ -928,7 +932,10 @@ useEffect(() => {
                   <th 
                     className={`table-header column-selectable ${filterField === "phone" ? "selected-column" : ""}`}
                     onClick={() => {
-                      if (filterField === "phone") setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                      if (filterField === "phone") {
+                        if (sortOrder === "asc") setSortOrder("desc");
+                        else setFilterField("");
+                      }
                       else { setFilterField("phone"); setSortOrder("asc"); }
                       setShowSortDisclaimer(false);
                       setSelectedRow(null);
@@ -939,7 +946,10 @@ useEffect(() => {
                   <th 
                     className={`table-header column-selectable ${filterField === "email" ? "selected-column" : ""}`}
                     onClick={() => {
-                      if (filterField === "email") setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                      if (filterField === "email") {
+                        if (sortOrder === "asc") setSortOrder("desc");
+                        else setFilterField("");
+                      }
                       else { setFilterField("email"); setSortOrder("asc"); }
                       setShowSortDisclaimer(false);
                       setSelectedRow(null);
@@ -950,7 +960,10 @@ useEffect(() => {
                   <th 
                     className={`table-header column-selectable ${filterField === "city" ? "selected-column" : ""}`}
                     onClick={() => {
-                      if (filterField === "city") setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                      if (filterField === "city") {
+                        if (sortOrder === "asc") setSortOrder("desc");
+                        else setFilterField("");
+                      }
                       else { setFilterField("city"); setSortOrder("asc"); }
                       setShowSortDisclaimer(false);
                       setSelectedRow(null);
@@ -961,7 +974,10 @@ useEffect(() => {
                   <th 
                     className={`table-header column-selectable ${filterField === "services" ? "selected-column" : ""}`}
                     onClick={() => {
-                      if (filterField === "services") setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                      if (filterField === "services") {
+                        if (sortOrder === "asc") setSortOrder("desc");
+                        else setFilterField("");
+                      }
                       else { setFilterField("services"); setSortOrder("asc"); }
                       setShowSortDisclaimer(false);
                       setSelectedRow(null);
@@ -972,7 +988,10 @@ useEffect(() => {
                   <th 
                     className={`table-header column-selectable ${filterField === "created_at" ? "selected-column" : ""}`}
                     onClick={() => {
-                      if (filterField === "created_at") setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                      if (filterField === "created_at") {
+                        if (sortOrder === "desc") setSortOrder("asc");
+                        else setFilterField("");
+                      }
                       else { setFilterField("created_at"); setSortOrder("desc"); }
                       setShowSortDisclaimer(false);
                       setSelectedRow(null);
