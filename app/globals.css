@@ -1574,6 +1574,20 @@ body {
   }
 }
 
+.notes-cell {
+  color: var(--text-dark);
+  min-width: 160px;
+}
+
+.notes-cell:empty::before {
+  content: "—";
+  color: var(--text-light);
+}
+
+.notes-input {
+  min-width: 160px;
+}
+
 .table-loading {
   padding: 2rem;
   text-align: center;

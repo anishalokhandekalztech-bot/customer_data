@@ -26,6 +26,7 @@ interface DataRow {
   services: string;
   date: string;
   time: string;
+  notes: string;
 }
 
 interface EditingCell {
@@ -84,6 +85,7 @@ useEffect(() => {
           services: d.service_name || "",
           date: dateStr,
           time: timeStr,
+          notes: d.notes || "",
         };
       });
       setData(firebaseData);
@@ -129,6 +131,7 @@ useEffect(() => {
       services: "",
       date: "",
       time: "",
+      notes: "",
     };
     const newData = [...data, newRow];
     
@@ -179,7 +182,7 @@ useEffect(() => {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, rowId: number, field: string) => {
-    const fields = ["salutation", "name", "phone", "email", "city", "services"];
+    const fields = ["salutation", "name", "phone", "email", "city", "services", "notes"];
     const currentIndex = fields.indexOf(field);
 
     if (e.key === "Enter") {
@@ -223,6 +226,7 @@ useEffect(() => {
         const cellKey = `${rowId}-${prevField}`;
         const prevEditVal = updatedCells.has(cellKey) ? updatedCells.get(cellKey) : row[prevField as keyof DataRow];
         setEditingCell({ rowId, field: prevField });
+
         setEditValue(String(prevEditVal ?? ""));
       }
     } else if (e.key === "ArrowDown") {
@@ -274,9 +278,11 @@ useEffect(() => {
     if (updatedCells.size === 0) return;
     
     // Check for empty values in the changed cells
+    const optionalFields = ["notes"];
     const emptyValuesFound: string[] = [];
     updatedCells.forEach((value, cellKey) => {
-      if (String(value).trim() === "") {
+      const field = cellKey.split("-").slice(1).join("-");
+      if (String(value).trim() === "" && !optionalFields.includes(field)) {
         emptyValuesFound.push(cellKey);
       }
     });
@@ -348,13 +354,14 @@ useEffect(() => {
     const firebasePromises: Promise<any>[] = [];
 
     // Update Firebase for each modified cell
+    const optionalFields = ["notes"];
     updatedCells.forEach((value, cellKey) => {
       const [rowId, field] = cellKey.split("-");
       const rowToUpdate = updatedData.find((row) => row.id === parseInt(rowId));
-      
-      if (rowToUpdate && String(value).trim() !== "") {
+      const isOptional = optionalFields.includes(field);
+
+      if (rowToUpdate && (String(value).trim() !== "" || isOptional)) {
         if (rowToUpdate.docId) {
-          // Update existing document
           let firestoreFields: Record<string, string> = {};
           if (field === "name") {
             const parts = value.trim().split(/\s+/);
@@ -368,11 +375,7 @@ useEffect(() => {
             alert("Failed to update row in Firebase. Changes will be local only.");
           });
           firebasePromises.push(promise);
-        } else {
-          // New row without docId - we'll handle this below
         }
-      } else if (rowToUpdate && rowToUpdate.docId && String(value).trim() === "") {
-        console.warn(`Skipped empty value for field '${field}' in row ${rowId}`);
       }
     });
 
@@ -387,6 +390,7 @@ useEffect(() => {
         email: newRow.email,
         city: newRow.city,
         service_name: newRow.services,
+        notes: newRow.notes,
         created_at: serverTimestamp(),
       })
         .then((docRef) => {
@@ -596,6 +600,7 @@ useEffect(() => {
       "Services": row.services,
       "Date": row.date,
       "Time": row.time,
+      "Notes": row.notes,
     }));
 
     const jsonString = JSON.stringify(jsonData, null, 2);
@@ -610,7 +615,7 @@ useEffect(() => {
 
   const handleViewInExcel = () => {
     const csv = [
-      ["Sr No.", "Salutation", "Name", "Phone No.", "Email", "City", "Services", "Date", "Time"],
+      ["Sr No.", "Salutation", "Name", "Phone No.", "Email", "City", "Services", "Date", "Time", "Notes"],
       ...data.map((row) => [
         row.id,
         row.salutation,
@@ -621,6 +626,7 @@ useEffect(() => {
         row.services,
         row.date,
         row.time,
+        row.notes,
       ]),
     ]
       .map((row) => row.map((cell) => `"${cell}"`).join(","))
@@ -860,14 +866,7 @@ useEffect(() => {
             )}
           </div>
 
-          {fetchError && (
-            <div className="fetch-error">{fetchError}</div>
-          )}
-
           <div className="table-wrapper" ref={tableWrapperRef}>
-            {isLoading && (
-              <div className="table-loading">Loading data…</div>
-            )}
             <table className="table">
               <thead className="table-head">
                 <tr>
@@ -880,6 +879,7 @@ useEffect(() => {
                   <th className="table-header">Services</th>
                   <th className="table-header">Date</th>
                   <th className="table-header">Time</th>
+                  <th className="table-header">Notes</th>
                 </tr>
               </thead>
               <tbody>
@@ -956,6 +956,35 @@ useEffect(() => {
                     <td className="table-cell">
                       <div className="table-cell-content">{row.time || "-"}</div>
                     </td>
+
+                    {/* EDITABLE NOTES COLUMN */}
+                    {(() => {
+                      const cellKey = `${row.id}-notes`;
+                      const isUpdated = updatedCells.has(cellKey);
+                      return (
+                        <td
+                          className={`table-cell ${editingCell?.rowId === row.id && editingCell?.field === "notes" ? "editing-cell" : ""} ${isUpdated ? "updated-cell" : ""}`}
+                          onDoubleClick={() => handleCellClick(row.id, "notes", String(row.notes ?? ""))}
+                        >
+                          {editingCell?.rowId === row.id && editingCell?.field === "notes" ? (
+                            <input
+                              type="text"
+                              value={editValue}
+                              onChange={handleCellChange}
+                              onBlur={() => handleCellBlur(row.id, "notes")}
+                              onKeyDown={(e) => handleKeyDown(e, row.id, "notes")}
+                              autoFocus
+                              className="table-input notes-input"
+                              placeholder="Add a note…"
+                            />
+                          ) : (
+                            <div className="table-cell-content notes-cell">
+                              {isUpdated ? updatedCells.get(cellKey) : row.notes || ""}
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })()}
 
                   </tr>
                 ))}
