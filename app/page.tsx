@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect} from "react";
-import {collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp} from "firebase/firestore";
+import { useState, useRef, useEffect } from "react";
+import { collection, getDocs, query, orderBy, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
 interface NavItem {
@@ -11,17 +11,21 @@ interface NavItem {
   hasDropdown?: boolean;
 }
 
+const navItems: NavItem[] = [];
+
+const EMPTY_DATA: DataRow[] = [];
+
 interface DataRow {
   id: number;
   docId?: string; // Firebase document ID
   salutation: string;
-  firstName: string;
-  lastName: string;
+  name: string;
   phone: string;
   email: string;
   city: string;
   services: string;
-  created_at:string;
+  date: string;
+  time: string;
 }
 
 interface EditingCell {
@@ -34,68 +38,64 @@ export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const tableWrapperRef = useRef<HTMLDivElement>(null);
 
-  const navItems: NavItem[] = [
-    // { id: "dashboard", label: "Home" },
-    // { id: "reports", label: "About Us" },
-    // { id: "analytics", label: "Start a Business", hasDropdown: true },
-    // { id: "settings", label: "Trademark Registration", hasDropdown: true },
-    // { id: "users", label: "Annual Compliance", hasDropdown: true },
-    // { id: "support", label: "Other Services", hasDropdown: true },
-    // { id: "customers", label: "Form Enteries" },
-  ];
-  const initialData: DataRow[] = [];
-
-  const [data, setData] = useState<DataRow[]>(initialData);
+  const [data, setData] = useState<DataRow[]>(EMPTY_DATA);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const [editValue, setEditValue] = useState<string>("");
   const [deleteMode, setDeleteMode] = useState<boolean>(false);
   const [selectedForDelete, setSelectedForDelete] = useState<Set<number>>(new Set());
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [filterField, setFilterField] = useState<string>("");
-  const [sortOrder, setSortOrder] = useState<string>("asc");
-  const [history, setHistory] = useState<DataRow[][]>([initialData]);
+  const [sortField, setSortField] = useState<string>("");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [history, setHistory] = useState<DataRow[][]>([EMPTY_DATA]);
   const [historyIndex, setHistoryIndex] = useState<number>(0);
   const [updatedCells, setUpdatedCells] = useState<Map<string, string>>(new Map());
   const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState<boolean>(false);
-  const [sortDropdownOpen, setSortDropdownOpen] = useState<boolean>(false);
-  const [showSortDisclaimer, setShowSortDisclaimer] = useState<boolean>(false);
   const [showEmptyValueModal, setShowEmptyValueModal] = useState<boolean>(false);
   const [emptyCells, setEmptyCells] = useState<string[]>([]);
 
 useEffect(() => {
   const fetchData = async () => {
-    const snapshot = await getDocs(collection(db, "form_submissions"));
-
-    const firebaseData: DataRow[] = snapshot.docs.map((doc, index) => {
-      const d = doc.data();
-
-      let formattedDate = "-";
-      if (d.created_at?.toDate) {
-      formattedDate = d.created_at.toDate().toLocaleString();
-      }
-
-      return {
-        id: index + 1, // required by your existing logic
-        docId: doc.id, // Store the Firebase document ID
-        salutation: d.salutation || "",
-        firstName: d.first_name || "",
-        lastName: d.last_name || "",
-        phone: d.phone || "",
-        email: d.email || "",
-        city: d.city || "",
-        services: d.service_name || "",
-        created_at: formattedDate || "",
-      };
-    });
-
-    // ⬇️ Inject Firebase data into your EXISTING flow
-    setData(firebaseData);
-    setHistory([firebaseData]);
-    setHistoryIndex(0);
+    try {
+      const snapshot = await getDocs(query(collection(db, "form_submissions"), orderBy("created_at", "desc")));
+      const firebaseData: DataRow[] = snapshot.docs.map((doc, index) => {
+        const d = doc.data();
+        let dateStr = "-";
+        let timeStr = "-";
+        if (d.created_at?.toDate) {
+          const jsDate: Date = d.created_at.toDate();
+          const day = String(jsDate.getDate()).padStart(2, "0");
+          const month = String(jsDate.getMonth() + 1).padStart(2, "0");
+          const year = jsDate.getFullYear();
+          dateStr = `${day}/${month}/${year}`;
+          timeStr = jsDate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+        }
+        return {
+          id: index + 1,
+          docId: doc.id,
+          salutation: d.salutation || "",
+          name: `${d.first_name || ""} ${d.last_name || ""}`.trim(),
+          phone: d.phone || "",
+          email: d.email || "",
+          city: d.city || "",
+          services: d.service_name || "",
+          date: dateStr,
+          time: timeStr,
+        };
+      });
+      setData(firebaseData);
+      setHistory([firebaseData]);
+      setHistoryIndex(0);
+    } catch (err) {
+      console.error("Failed to fetch data:", err);
+      setFetchError("Failed to load data. Please refresh the page.");
+    } finally {
+      setIsLoading(false);
+    }
   };
-
   fetchData();
 }, []);
 
@@ -122,13 +122,13 @@ useEffect(() => {
     const newRow: DataRow = {
       id: data.length + 1,
       salutation: "",
-      firstName: "",
-      lastName: "",
+      name: "",
       phone: "",
       email: "",
       city: "",
       services: "",
-      created_at:"",
+      date: "",
+      time: "",
     };
     const newData = [...data, newRow];
     
@@ -152,7 +152,7 @@ useEffect(() => {
     }, 0);
   };
 
-  const handleCellClick = (rowId: number, field: string, value: any) => {
+  const handleCellClick = (rowId: number, field: string, value: string) => {
     setEditingCell({ rowId, field });
     // Use the updated value from updatedCells if it exists, otherwise use the original row value
     const cellKey = `${rowId}-${field}`;
@@ -179,7 +179,7 @@ useEffect(() => {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, rowId: number, field: string) => {
-    const fields = ["salutation", "firstName", "lastName", "phone", "email", "city", "services"];
+    const fields = ["salutation", "name", "phone", "email", "city", "services"];
     const currentIndex = fields.indexOf(field);
 
     if (e.key === "Enter") {
@@ -204,7 +204,7 @@ useEffect(() => {
         const cellKey = `${rowId}-${nextField}`;
         const nextEditVal = updatedCells.has(cellKey) ? updatedCells.get(cellKey) : row[nextField as keyof DataRow];
         setEditingCell({ rowId, field: nextField });
-        setEditValue(nextEditVal || "");
+        setEditValue(String(nextEditVal ?? ""));
       }
     } else if (e.key === "ArrowLeft" && currentIndex > 0) {
       e.preventDefault();
@@ -223,7 +223,7 @@ useEffect(() => {
         const cellKey = `${rowId}-${prevField}`;
         const prevEditVal = updatedCells.has(cellKey) ? updatedCells.get(cellKey) : row[prevField as keyof DataRow];
         setEditingCell({ rowId, field: prevField });
-        setEditValue(prevEditVal || "");
+        setEditValue(String(prevEditVal ?? ""));
       }
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -241,7 +241,7 @@ useEffect(() => {
         const cellKey = `${nextRow.id}-${field}`;
         const nextEditVal = updatedCells.has(cellKey) ? updatedCells.get(cellKey) : nextRow[field as keyof DataRow];
         setEditingCell({ rowId: nextRow.id, field });
-        setEditValue(nextEditVal || "");
+        setEditValue(String(nextEditVal ?? ""));
       }
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
@@ -260,7 +260,7 @@ useEffect(() => {
           const cellKey = `${prevRow.id}-${field}`;
           const prevEditVal = updatedCells.has(cellKey) ? updatedCells.get(cellKey) : prevRow[field as keyof DataRow];
           setEditingCell({ rowId: prevRow.id, field });
-          setEditValue(prevEditVal || "");
+          setEditValue(String(prevEditVal ?? ""));
         }
       }
     }
@@ -289,7 +289,7 @@ useEffect(() => {
 
     // Check if any row being updated will have incomplete data after updates
     const rowsBeingUpdated = new Set<number>();
-    updatedCells.forEach((value, cellKey) => {
+    updatedCells.forEach((_value, cellKey) => {
       const [rowId] = cellKey.split("-");
       rowsBeingUpdated.add(parseInt(rowId));
     });
@@ -303,15 +303,14 @@ useEffect(() => {
         updatedCells.forEach((value, cellKey) => {
           const [cellRowId, field] = cellKey.split("-");
           if (parseInt(cellRowId) === rowId) {
-            finalRow[field as keyof DataRow] = value;
+            (finalRow as unknown as Record<string, string>)[field] = value;
           }
         });
 
         // Check if the final row has any empty fields
         const hasEmptyField = 
           String(finalRow.salutation).trim() === "" ||
-          String(finalRow.firstName).trim() === "" ||
-          String(finalRow.lastName).trim() === "" ||
+          String(finalRow.name).trim() === "" ||
           String(finalRow.phone).trim() === "" ||
           String(finalRow.email).trim() === "" ||
           String(finalRow.city).trim() === "" ||
@@ -356,9 +355,15 @@ useEffect(() => {
       if (rowToUpdate && String(value).trim() !== "") {
         if (rowToUpdate.docId) {
           // Update existing document
-          const promise = updateDoc(doc(db, "form_submissions", rowToUpdate.docId), {
-            [field]: value,
-          }).catch((error) => {
+          let firestoreFields: Record<string, string> = {};
+          if (field === "name") {
+            const parts = value.trim().split(/\s+/);
+            firestoreFields = { first_name: parts[0] || "", last_name: parts.slice(1).join(" ") };
+          } else {
+            const fieldMap: Record<string, string> = { services: "service_name" };
+            firestoreFields = { [fieldMap[field] ?? field]: value };
+          }
+          const promise = updateDoc(doc(db, "form_submissions", rowToUpdate.docId), firestoreFields).catch((error) => {
             console.error("Error updating document: ", error);
             alert("Failed to update row in Firebase. Changes will be local only.");
           });
@@ -376,8 +381,8 @@ useEffect(() => {
     newRows.forEach((newRow) => {
       const promise = addDoc(collection(db, "form_submissions"), {
         salutation: newRow.salutation,
-        first_name: newRow.firstName,
-        last_name: newRow.lastName,
+        first_name: newRow.name.trim().split(/\s+/)[0] || "",
+        last_name: newRow.name.trim().split(/\s+/).slice(1).join(" ") || "",
         phone: newRow.phone,
         email: newRow.email,
         city: newRow.city,
@@ -436,15 +441,14 @@ useEffect(() => {
           updatedCells.forEach((value, cellKey) => {
             const [cellRowId, field] = cellKey.split("-");
             if (parseInt(cellRowId) === rowId) {
-              finalRow[field as keyof DataRow] = value;
+              (finalRow as unknown as Record<string, string>)[field] = value;
             }
           });
 
           // Find which fields are empty in the final state
           const emptyFields = [];
           if (String(finalRow.salutation).trim() === "") emptyFields.push("Salutation");
-          if (String(finalRow.firstName).trim() === "") emptyFields.push("First Name");
-          if (String(finalRow.lastName).trim() === "") emptyFields.push("Last Name");
+          if (String(finalRow.name).trim() === "") emptyFields.push("Name");
           if (String(finalRow.phone).trim() === "") emptyFields.push("Phone");
           if (String(finalRow.email).trim() === "") emptyFields.push("Email");
           if (String(finalRow.city).trim() === "") emptyFields.push("City");
@@ -470,7 +474,7 @@ useEffect(() => {
           isRowIncomplete: false,
         };
       }
-    }).filter(Boolean);
+    }).filter((c): c is NonNullable<typeof c> => c != null);
   };
 
   const cancelEditing = () => {
@@ -482,7 +486,12 @@ useEffect(() => {
 
   const handleDelete = () => {
     if (editingCell) {
-      // Delete the row being edited and reassign serial numbers
+      const rowToDelete = data.find((row) => row.id === editingCell.rowId);
+      if (rowToDelete?.docId) {
+        deleteDoc(doc(db, "form_submissions", rowToDelete.docId)).catch((error) => {
+          console.error("Error deleting document:", error);
+        });
+      }
       const filteredData = data.filter((row) => row.id !== editingCell.rowId);
       const updatedData = filteredData.map((row, index) => ({
         ...row,
@@ -580,13 +589,13 @@ useEffect(() => {
     const jsonData = data.map((row) => ({
       "Sr No.": row.id,
       "Salutation": row.salutation,
-      "First Name": row.firstName,
-      "Last Name": row.lastName,
+      "Name": row.name,
       "Phone No.": row.phone,
       "Email": row.email,
       "City": row.city,
       "Services": row.services,
-      "Created_at":row.created_at,
+      "Date": row.date,
+      "Time": row.time,
     }));
 
     const jsonString = JSON.stringify(jsonData, null, 2);
@@ -596,21 +605,22 @@ useEffect(() => {
     a.href = url;
     a.download = "customer_data.json";
     a.click();
+    window.URL.revokeObjectURL(url);
   };
 
   const handleViewInExcel = () => {
     const csv = [
-      ["Sr No.", "Salutation", "First Name", "Last Name", "Phone No.", "Email", "City", "Services", "Created_at"],
+      ["Sr No.", "Salutation", "Name", "Phone No.", "Email", "City", "Services", "Date", "Time"],
       ...data.map((row) => [
         row.id,
         row.salutation,
-        row.firstName,
-        row.lastName,
+        row.name,
         row.phone,
         row.email,
         row.city,
         row.services,
-        row.created_at,
+        row.date,
+        row.time,
       ]),
     ]
       .map((row) => row.map((cell) => `"${cell}"`).join(","))
@@ -628,35 +638,26 @@ useEffect(() => {
   // Filter and search logic
   const filteredData = data
     .filter((row) => {
-      const searchMatch = searchTerm === "" || 
-        Object.values(row).some((value) => 
+      return searchTerm === "" ||
+        Object.values(row).some((value) =>
           String(value).toLowerCase().includes(searchTerm.toLowerCase())
         );
-      return searchMatch;
     })
     .sort((a, b) => {
-      if (!filterField) return 0;
-
-      let comparison = 0;
-
-      if (filterField === "created_at") {
-        const dateA = new Date(a.created_at).getTime();
-        const dateB = new Date(b.created_at).getTime();
-        
-        const timeA = isNaN(dateA) ? 0 : dateA;
-        const timeB = isNaN(dateB) ? 0 : dateB;
-
-        if (timeA < timeB) comparison = -1;
-        if (timeA > timeB) comparison = 1;
-      } else {
-        const fieldA = String(a[filterField as keyof DataRow]).toLowerCase();
-        const fieldB = String(b[filterField as keyof DataRow]).toLowerCase();
-
-        if (fieldA < fieldB) comparison = -1;
-        if (fieldA > fieldB) comparison = 1;
+      if (!sortField) return 0;
+      if (sortField === "date") {
+        const parseDate = (s: string) => {
+          const [d, m, y] = s.split("/");
+          return new Date(+y, +m - 1, +d).getTime();
+        };
+        const diff = parseDate(a.date) - parseDate(b.date);
+        return sortDir === "asc" ? diff : -diff;
       }
-
-      return sortOrder === "asc" ? comparison : -comparison;
+      const valA = String(a[sortField as keyof DataRow]).toLowerCase();
+      const valB = String(b[sortField as keyof DataRow]).toLowerCase();
+      if (valA < valB) return sortDir === "asc" ? -1 : 1;
+      if (valA > valB) return sortDir === "asc" ? 1 : -1;
+      return 0;
     });
 
   return (
@@ -821,184 +822,64 @@ useEffect(() => {
                 className="search-input"
               />
             </div>
-            {/* <div className="filter-sort-container">
-              <div className="sort-dropdown-container">
-                <button
-                  onClick={() => {
-                    if (!filterField) {
-                      setShowSortDisclaimer(true);
-                      return;
-                    }
-                    setSortDropdownOpen(!sortDropdownOpen);
-                    setShowSortDisclaimer(false);
-                  }}
-                  className="sort-dropdown-btn"
-                >
-                  Sort {sortDropdownOpen ? "∧" : "∨"}
-                </button>
-                
-                {showSortDisclaimer && (
-                  <div className="sort-disclaimer">
-                    ⚠ Please select a column to sort
-                  </div>
-                )}
-                
-                {sortDropdownOpen && filterField && (
-                  <div className="sort-dropdown-menu">
-                    <button
-                      onClick={() => {
-                        setSortOrder("asc");
-                        setSortDropdownOpen(false);
-                      }}
-                      className={`sort-option ${sortOrder === "asc" ? "active" : ""}`}
-                    >
-                      {filterField === "name" || filterField === "city" || filterField === "services" || filterField === "email" ? "A - Z" : "Ascending"}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSortOrder("desc");
-                        setSortDropdownOpen(false);
-                      }}
-                      className={`sort-option ${sortOrder === "desc" ? "active" : ""}`}
-                    >
-                      {filterField === "name" || filterField === "city" || filterField === "services" || filterField === "email" ? "Z - A" : "Descending"}
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div> */}
 
-            {(searchTerm || filterField) && (
-              <button
-                onClick={() => {
-                  setSearchTerm("");
-                  setFilterField("");
-                  setSortOrder("asc");
+            <div className="sort-by-container">
+              <label className="sort-by-label">Sort by:</label>
+              <select
+                value={sortField}
+                onChange={(e) => {
+                  setSortField(e.target.value);
+                  setSortDir("asc");
                 }}
+                className="sort-by-select"
+              >
+                <option value="">-- None --</option>
+                <option value="city">City</option>
+                <option value="services">Services</option>
+                <option value="date">Date</option>
+              </select>
+              {sortField && (
+                <button
+                  className={`sort-dir-btn ${sortDir === "desc" ? "desc" : ""}`}
+                  onClick={() => setSortDir(sortDir === "asc" ? "desc" : "asc")}
+                >
+                  {sortField === "date"
+                    ? sortDir === "asc" ? "Older → Newer" : "Newer → Older"
+                    : sortDir === "asc" ? "A → Z" : "Z → A"}
+                </button>
+              )}
+            </div>
+
+            {(searchTerm || sortField) && (
+              <button
+                onClick={() => { setSearchTerm(""); setSortField(""); setSortDir("asc"); }}
                 className="btn btn-clear"
               >
-                Clear All
+                Clear
               </button>
             )}
           </div>
 
+          {fetchError && (
+            <div className="fetch-error">{fetchError}</div>
+          )}
+
           <div className="table-wrapper" ref={tableWrapperRef}>
+            {isLoading && (
+              <div className="table-loading">Loading data…</div>
+            )}
             <table className="table">
               <thead className="table-head">
                 <tr>
                   <th className="table-header">Sr No.</th>
-                  <th 
-                    className={`table-header column-selectable ${filterField === "salutation" ? "selected-column" : ""}`}
-                    onClick={() => {
-                      if (filterField === "salutation") {
-                        if (sortOrder === "asc") setSortOrder("desc");
-                        else setFilterField("");
-                      }
-                      else { setFilterField("salutation"); setSortOrder("asc"); }
-                      setShowSortDisclaimer(false);
-                      setSelectedRow(null);
-                    }}
-                  >
-                    Salutation {filterField === "salutation" && (sortOrder === "asc" ? "↑" : "↓")}
-                  </th>
-                  <th 
-                    className={`table-header column-selectable ${filterField === "firstName" ? "selected-column" : ""}`}
-                    onClick={() => {
-                      if (filterField === "firstName") {
-                        if (sortOrder === "asc") setSortOrder("desc");
-                        else setFilterField("");
-                      }
-                      else { setFilterField("firstName"); setSortOrder("asc"); }
-                      setShowSortDisclaimer(false);
-                      setSelectedRow(null);
-                    }}
-                  >
-                    First Name {filterField === "firstName" && (sortOrder === "asc" ? "↑" : "↓")}
-                  </th>
-                  <th 
-                    className={`table-header column-selectable ${filterField === "lastName" ? "selected-column" : ""}`}
-                    onClick={() => {
-                      if (filterField === "lastName") {
-                        if (sortOrder === "asc") setSortOrder("desc");
-                        else setFilterField("");
-                      }
-                      else { setFilterField("lastName"); setSortOrder("asc"); }
-                      setShowSortDisclaimer(false);
-                      setSelectedRow(null);
-                    }}
-                  >
-                    Last Name {filterField === "lastName" && (sortOrder === "asc" ? "↑" : "↓")}
-                  </th>
-                  <th 
-                    className={`table-header column-selectable ${filterField === "phone" ? "selected-column" : ""}`}
-                    onClick={() => {
-                      if (filterField === "phone") {
-                        if (sortOrder === "asc") setSortOrder("desc");
-                        else setFilterField("");
-                      }
-                      else { setFilterField("phone"); setSortOrder("asc"); }
-                      setShowSortDisclaimer(false);
-                      setSelectedRow(null);
-                    }}
-                  >
-                    Phone No. {filterField === "phone" && (sortOrder === "asc" ? "↑" : "↓")}
-                  </th>
-                  <th 
-                    className={`table-header column-selectable ${filterField === "email" ? "selected-column" : ""}`}
-                    onClick={() => {
-                      if (filterField === "email") {
-                        if (sortOrder === "asc") setSortOrder("desc");
-                        else setFilterField("");
-                      }
-                      else { setFilterField("email"); setSortOrder("asc"); }
-                      setShowSortDisclaimer(false);
-                      setSelectedRow(null);
-                    }}
-                  >
-                    Email {filterField === "email" && (sortOrder === "asc" ? "↑" : "↓")}
-                  </th>
-                  <th 
-                    className={`table-header column-selectable ${filterField === "city" ? "selected-column" : ""}`}
-                    onClick={() => {
-                      if (filterField === "city") {
-                        if (sortOrder === "asc") setSortOrder("desc");
-                        else setFilterField("");
-                      }
-                      else { setFilterField("city"); setSortOrder("asc"); }
-                      setShowSortDisclaimer(false);
-                      setSelectedRow(null);
-                    }}
-                  >
-                    City {filterField === "city" && (sortOrder === "asc" ? "↑" : "↓")}
-                  </th>
-                  <th 
-                    className={`table-header column-selectable ${filterField === "services" ? "selected-column" : ""}`}
-                    onClick={() => {
-                      if (filterField === "services") {
-                        if (sortOrder === "asc") setSortOrder("desc");
-                        else setFilterField("");
-                      }
-                      else { setFilterField("services"); setSortOrder("asc"); }
-                      setShowSortDisclaimer(false);
-                      setSelectedRow(null);
-                    }}
-                  >
-                    Services {filterField === "services" && (sortOrder === "asc" ? "↑" : "↓")}
-                  </th>
-                  <th 
-                    className={`table-header column-selectable ${filterField === "created_at" ? "selected-column" : ""}`}
-                    onClick={() => {
-                      if (filterField === "created_at") {
-                        if (sortOrder === "desc") setSortOrder("asc");
-                        else setFilterField("");
-                      }
-                      else { setFilterField("created_at"); setSortOrder("desc"); }
-                      setShowSortDisclaimer(false);
-                      setSelectedRow(null);
-                    }}
-                  >
-                    Date & Time {filterField === "created_at" && (sortOrder === "asc" ? "↑" : "↓")}
-                  </th>
+                  <th className="table-header">Salutation</th>
+                  <th className="table-header">Name</th>
+                  <th className="table-header">Phone No.</th>
+                  <th className="table-header">Email</th>
+                  <th className="table-header">City</th>
+                  <th className="table-header">Services</th>
+                  <th className="table-header">Date</th>
+                  <th className="table-header">Time</th>
                 </tr>
               </thead>
               <tbody>
@@ -1024,17 +905,16 @@ useEffect(() => {
                         <div className="table-cell-content">{index + 1}</div>
                       </td>
                     )}
-                    {["salutation", "firstName", "lastName", "phone", "email", "city", "services"].map((field) => {
+                    {["salutation", "name", "phone", "email", "city", "services"].map((field) => {
                       const cellKey = `${row.id}-${field}`;
                       const isUpdated = updatedCells.has(cellKey);
-                      const isColumnSelected = filterField === field;
                       const salutationOptions = ["Mr.", "Mrs.", "Ms.", "Dr.", "Prof."];
                       return (
                       <td
                         key={cellKey}
-                        className={`table-cell ${editingCell?.rowId === row.id && editingCell?.field === field ? "editing-cell" : ""} ${isUpdated ? "updated-cell" : ""} ${isColumnSelected ? "selected-column-cell" : ""}`}
+                        className={`table-cell ${editingCell?.rowId === row.id && editingCell?.field === field ? "editing-cell" : ""} ${isUpdated ? "updated-cell" : ""}`}
                         onDoubleClick={() =>
-                          handleCellClick(row.id, field, row[field as keyof DataRow])
+                          handleCellClick(row.id, field, String(row[field as keyof DataRow] ?? ""))
                         }
                       >
                         {editingCell?.rowId === row.id && editingCell?.field === field ? (
@@ -1069,11 +949,12 @@ useEffect(() => {
                     );
                     })}
                     
-                    {/* READ-ONLY DATE COLUMN */}
+                    {/* READ-ONLY DATE AND TIME COLUMNS */}
                     <td className="table-cell">
-                      <div className="table-cell-content">
-                        {row.created_at || "-"}
-                      </div>
+                      <div className="table-cell-content">{row.date || "-"}</div>
+                    </td>
+                    <td className="table-cell">
+                      <div className="table-cell-content">{row.time || "-"}</div>
                     </td>
 
                   </tr>
